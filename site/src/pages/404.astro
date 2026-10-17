@@ -1,0 +1,18 @@
+---
+import Base from '../layouts/Base.astro';
+import { url } from '../lib/site';
+---
+<Base title="페이지 없음">
+  <section class="wrap nf">
+    <p class="code">O(404)</p>
+    <h1>찾는 페이지가 없다</h1>
+    <p class="lede">주소가 바뀌었거나 아직 올리지 않은 문제일 수 있다.</p>
+    <div class="cta"><a class="btn primary" href={url('')}>홈으로</a><a class="btn" href={url('problems')}>문제 목록</a></div>
+  </section>
+</Base>
+<style>
+  .nf { padding-block: 120px 0; display: grid; gap: 16px; justify-items: start; }
+  .code { font-family: var(--font-display); font-weight: 800; font-size: clamp(4rem, 14vw, 9rem); letter-spacing: -0.05em; line-height: 1; color: var(--c-sq); }
+  h1 { font-size: 1.75rem; }
+  .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+</style>

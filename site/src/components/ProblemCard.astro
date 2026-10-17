@@ -1,0 +1,52 @@
+---
+import type { Problem } from '../lib/problems';
+import { url } from '../lib/site';
+interface Props { p: Problem; }
+const { p } = Astro.props;
+const f = p.final;
+---
+<a class="card" href={url(`problems/${p.slug}`)}
+   data-level={p.level ?? ''} data-tags={p.tags.join('|')} data-title={p.title} data-tier={f?.tier ?? 'unknown'}
+   data-solved={p.solved ?? ''} data-tries={p.solutions.length}>
+  <div class="top">
+    <span class="level">{p.level !== null ? `Lv.${p.level}` : 'Lv.?'}</span>
+    {f && <span class={`bigo t-${f.tier}`}>{f.complexity ?? '미기재'}</span>}
+  </div>
+  <h3 transition:name={`title-${p.slug}`}>{p.title}</h3>
+  {p.summaryText && <p class="sum">{p.summaryText.split('\n')[0]}</p>}
+  <div class="trail" aria-label={`풀이 ${p.solutions.length}개`}>
+    {p.solutions.map((s, i) => (
+      <>
+        {i > 0 && <span class="seg" />}
+        <span class={`dot t-${s.tier}${i === p.solutions.length - 1 ? ' fin' : ''}`} title={`Solution ${s.index}: ${s.complexity ?? '미기재'}`} />
+      </>
+    ))}
+    <span class="tries">풀이 {p.solutions.length}개</span>
+  </div>
+  <div class="foot">
+    <span class="tags">{p.tags.slice(0, 3).map((t) => <span class="chip">{t}</span>)}</span>
+    {p.solved && <time datetime={p.solved}>{p.solved.replaceAll('-', '.')}</time>}
+  </div>
+</a>
+
+<style>
+  .card {
+    position: relative; display: grid; gap: 12px; align-content: start; text-decoration: none; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 20px 18px;
+    transition: transform .35s var(--ease-out), border-color .25s, box-shadow .35s var(--ease-out);
+    min-width: 0;
+  }
+  .card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); box-shadow: var(--shadow); }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  h3 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; }
+  .sum { color: var(--ink-2); font-size: 0.9375rem; line-height: 1.65; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .trail { display: flex; align-items: center; gap: 0; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; border: 2.5px solid var(--c, var(--c-unknown)); background: var(--surface); flex: none; transition: transform .3s var(--ease-out); }
+  .dot.fin { background: var(--c, var(--c-unknown)); }
+  .seg { width: 22px; height: 2px; background: var(--line); flex: none; }
+  .card:hover .dot { transform: scale(1.15); }
+  .tries { margin-left: 12px; font: 0.75rem var(--font-mono); color: var(--ink-3); }
+  .foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  time { font: 0.75rem var(--font-mono); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+</style>

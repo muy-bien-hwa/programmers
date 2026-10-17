@@ -1,0 +1,399 @@
+---
+import { Code } from 'astro:components';
+import { diffLines } from 'diff';
+import Base from '../../layouts/Base.astro';
+import Runner from '../../components/Runner.astro';
+import { getProblems, tierLabel, type Problem, type Solution } from '../../lib/problems';
+import { url } from '../../lib/site';
+
+export function getStaticPaths() {
+  const all = getProblems();
+  return all.map((p, i) => ({ params: { slug: p.slug }, props: { p, prev: all[i + 1] ?? null, next: all[i - 1] ?? null } }));
+}
+interface Props { p: Problem; prev: Problem | null; next: Problem | null; }
+const { p, prev, next } = Astro.props;
+const sols = p.solutions;
+const first = sols[0], last = p.final;
+
+const chgTransformer = (s: Solution) => ({
+  name: 'mark-changed',
+  line(this: any, node: any, line: number) {
+    if (s.changedLines.includes(line)) this.addClassToHast(node, 'chg');
+  },
+});
+
+// 이웃 풀이 diff
+const diffs = sols.slice(1).map((s, i) => {
+  const a = sols[i];
+  const parts = diffLines(a.code + '\n', s.code + '\n');
+  const rows: { t: 'add' | 'del' | 'same'; text: string }[] = [];
+  for (const part of parts) {
+    const lines = part.value.replace(/\n$/, '').split('\n');
+    for (const l of lines) rows.push({ t: part.added ? 'add' : part.removed ? 'del' : 'same', text: l });
+  }
+  const add = rows.filter((r) => r.t === 'add').length, del = rows.filter((r) => r.t === 'del').length;
+  return { from: a.index, to: s.index, rows, add, del };
+});
+
+const tierValue = { sq: 0, nlog: 1, lin: 2, unknown: 1 } as const;
+const curve = sols.map((s) => tierValue[s.tier]);
+const desc = p.summaryText ? p.summaryText.split('\n')[0] : `${p.title} 풀이 과정`;
+---
+<Base title={p.title} active="problems" description={desc}>
+  <article class="problem">
+    <header class="wrap ph">
+      <a class="back" href={url('problems')}>← 문제 목록</a>
+      <div class="meta">
+        <span class="level">{p.level !== null ? `Lv.${p.level}` : 'Lv.?'}</span>
+        {p.tags.map((t) => <span class="chip">{t}</span>)}
+      </div>
+      <h1 transition:name={`title-${p.slug}`}>{p.title}</h1>
+      <dl class="facts">
+        <div><dt>최종 복잡도</dt><dd>{last ? <span class={`bigo t-${last.tier}`}>{last.complexity ?? '미기재'}</span> : '—'}</dd></div>
+        {first && last && first !== last && <div><dt>처음 풀이</dt><dd><span class={`bigo t-${first.tier}`}>{first.complexity ?? '미기재'}</span></dd></div>}
+        <div><dt>풀이 수</dt><dd class="num">{sols.length}</dd></div>
+        {p.solved && <div><dt>푼 날짜</dt><dd class="num">{p.solved.replaceAll('-', '.')}</dd></div>}
+      </dl>
+      {p.link && <a class="btn src" href={p.link} target="_blank" rel="noopener">프로그래머스에서 문제 보기 ↗</a>}
+    </header>
+
+    <section class="wrap summary">
+      <div class="sum-text">
+        <h2 class="h2">문제 요약</h2>
+        {p.summaryHtml
+          ? <div class="prose" set:html={p.summaryHtml} />
+          : <p class="lede muted">요약이 아직 없다. README 머리말의 summary에 직접 쓴 요약을 넣으면 여기에 나온다.</p>}
+        {p.link && <p class="note">문제 원문은 저작권 때문에 싣지 않고 링크로 대신한다.</p>}
+      </div>
+      {p.examples.length > 0 && (
+        <div class="examples">
+          <h3>입출력 예</h3>
+          <div class="tbl">
+            <table>
+              <thead><tr>{p.examples[0].args.map((_, i) => <th>입력 {i + 1}</th>)}<th>결과</th></tr></thead>
+              <tbody>{p.examples.map((e) => <tr>{e.args.map((a) => <td><code>{a}</code></td>)}<td><code>{e.expected}</code></td></tr>)}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </section>
+
+    {sols.length > 0 && (
+      <section class="evo" id="evolution" data-curve={JSON.stringify(curve)}>
+        <div class="wrap">
+          <div class="evo-head">
+            <h2 class="h2">풀이가 바뀐 과정</h2>
+            <p class="lede">스크롤을 내리면 풀이가 하나씩 넘어간다. 오른쪽 코드에서 파랗게 칠해진 줄이 이전 풀이에서 바뀐 부분이다.</p>
+          </div>
+          <div class="evo-grid">
+            <ol class="steps">
+              {sols.map((s, i) => (
+                <li class="step" data-i={i}>
+                  <div class="step-card">
+                    <div class="step-top">
+                      <span class="sn">Solution {s.index}</span>
+                      {s.result && <span class="verdict ok">{s.result}</span>}
+                      {!s.result && s.issueHtml && <span class="verdict warn">개선 필요</span>}
+                    </div>
+                    <p class={`big-o t-${s.tier}`}>{s.complexity ?? '미기재'}</p>
+                    {s.noteHtml && <div class="prose step-note" set:html={s.noteHtml} />}
+                    {s.issueHtml && (
+                      <div class="issue">
+                        <span class="issue-h">{i === sols.length - 1 ? '회고' : '문제점'}</span>
+                        <div class="prose" set:html={s.issueHtml} />
+                      </div>
+                    )}
+                    {s.changedLines.length > 0 && <p class="delta">이전 풀이 대비 {s.changedLines.length}줄 변경</p>}
+                  </div>
+                  <div class="inline-code">
+                    <div class="file">{s.file}</div>
+                    <Code code={s.code} lang="python" theme="tokyo-night" transformers={[chgTransformer(s)]} />
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <div class="stage-wrap">
+              <div class="stage">
+                <div class="stage-bar">
+                  <div class="rail" role="tablist" aria-label="풀이 선택">
+                    {sols.map((s, i) => (
+                      <button type="button" class={`node t-${s.tier}`} data-go={i} role="tab" aria-selected={i === 0 ? 'true' : 'false'} aria-label={`Solution ${s.index}로 이동`}>
+                        <i></i><span>S{s.index}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <canvas class="meter" id="meter" aria-hidden="true"></canvas>
+                </div>
+                <div class="panels">
+                  {sols.map((s, i) => (
+                    <div class={`panel${i === 0 ? ' active' : ''}`} data-i={i} aria-hidden={i === 0 ? 'false' : 'true'}>
+                      <div class="file"><span>{s.file}</span><span class={`bigo t-${s.tier}`}>{s.complexity ?? '미기재'}</span></div>
+                      <Code code={s.code} lang="python" theme="tokyo-night" transformers={[chgTransformer(s)]} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    )}
+
+    {diffs.length > 0 && (
+      <section class="wrap diff-sec" id="diff">
+        <div class="diff-head">
+          <h2 class="h2">코드 diff</h2>
+          <div class="pairs" role="tablist" aria-label="비교할 풀이">
+            {diffs.map((d, i) => (
+              <button type="button" class={`pair${i === diffs.length - 1 ? ' on' : ''}`} data-d={i} role="tab" aria-selected={i === diffs.length - 1 ? 'true' : 'false'}>
+                S{d.from} → S{d.to}
+              </button>
+            ))}
+          </div>
+        </div>
+        {diffs.map((d, i) => (
+          <div class="diff" data-d={i} hidden={i !== diffs.length - 1}>
+            <div class="diff-stat"><span class="add">+{d.add}</span><span class="del">−{d.del}</span><span>solution_{d.from}.py → solution_{d.to}.py</span></div>
+            <pre class="diff-code"><code>{d.rows.map((r, k) => (
+              <span class={`dl ${r.t}`} style={`--k:${k}`}><span class="sign">{r.t === 'add' ? '+' : r.t === 'del' ? '−' : ' '}</span>{r.text || ' '}</span>
+            ))}</code></pre>
+          </div>
+        ))}
+      </section>
+    )}
+
+    <Runner p={p} />
+
+    <nav class="wrap pn" aria-label="다른 문제">
+      {prev ? <a class="pn-a" href={url(`problems/${prev.slug}`)}><small>이전 문제</small><b>{prev.title}</b></a> : <span></span>}
+      {next ? <a class="pn-a r" href={url(`problems/${next.slug}`)}><small>다음 문제</small><b>{next.title}</b></a> : <span></span>}
+    </nav>
+  </article>
+</Base>
+
+<style>
+  .ph { padding-block: 48px 0; display: grid; gap: 18px; justify-items: start; }
+  .back { color: var(--ink-3); text-decoration: none; font-size: 0.9375rem; }
+  .back:hover { color: var(--accent); }
+  .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  h1 { font-size: clamp(2.5rem, 7vw, 4.5rem); font-weight: 700; letter-spacing: -0.035em; line-height: 1.1; }
+  .facts { display: flex; flex-wrap: wrap; gap: 14px 36px; margin: 6px 0 0; }
+  .facts div { display: grid; gap: 4px; }
+  .facts dt { font-size: 0.8125rem; color: var(--ink-3); }
+  .facts dd { margin: 0; }
+  .facts .num { font-family: var(--font-display); font-weight: 600; font-size: 1.125rem; font-variant-numeric: tabular-nums; }
+  .src { margin-top: 4px; }
+
+  .h2 { font-size: clamp(1.375rem, 2.6vw, 1.75rem); font-weight: 700; letter-spacing: -0.015em; }
+  .summary { margin-top: 64px; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 40px; align-items: start; }
+  .sum-text { display: grid; gap: 14px; }
+  .sum-text .prose :global(p) { color: var(--ink); font-size: 1.0625rem; }
+  .muted { color: var(--ink-3); }
+  .note { font-size: 0.8125rem; color: var(--ink-3); }
+  .examples { display: grid; gap: 10px; min-width: 0; }
+  .examples h3 { font-size: 0.9375rem; color: var(--ink-2); font-weight: 600; }
+  .tbl { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.875rem; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-weight: 600; color: var(--ink-3); font-size: 0.75rem; }
+  tr:last-child td { border-bottom: 0; }
+  td code { background: none; padding: 0; }
+
+  /* ---------- Evolution ---------- */
+  .evo { margin-top: 96px; }
+  .evo-head { display: grid; gap: 10px; max-width: 68ch; margin-bottom: 36px; }
+  .evo-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 40px; align-items: start; }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; min-width: 0; }
+  .step { min-width: 0; min-height: 78vh; display: flex; flex-direction: column; justify-content: center; padding-block: 24px; }
+  .step:first-child { min-height: 60vh; justify-content: flex-start; }
+  .step:last-child { min-height: 70vh; }
+  .step-card {
+    display: grid; gap: 14px; padding: 26px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface);
+    opacity: .45; transform: scale(.98); transition: opacity .5s var(--ease-out), transform .5s var(--ease-out), border-color .5s, box-shadow .5s;
+  }
+  .step.active .step-card { opacity: 1; transform: none; border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); box-shadow: var(--shadow); }
+  .step-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .sn { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--ink-3); }
+  .verdict { font-size: 0.8125rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .verdict::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .verdict.ok { color: var(--c-lin); }
+  .verdict.warn { color: var(--c-sq); }
+  .big-o { color: var(--c, var(--c-unknown)); font-family: var(--font-display); font-weight: 800; font-size: clamp(2.25rem, 4.5vw, 3.25rem); letter-spacing: -0.035em; line-height: 1; }
+  .step-note :global(p) { color: var(--ink); }
+  .issue { display: grid; gap: 6px; padding: 14px 16px; border-radius: 12px; background: var(--paper-2); }
+  .issue-h { font-size: 0.75rem; font-weight: 700; color: var(--ink-3); }
+  .issue .prose :global(p) { font-size: 0.9375rem; }
+  .delta { font: 0.75rem var(--font-mono); color: var(--accent); }
+  .inline-code { display: none; min-width: 0; }
+
+  .stage-wrap { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 84px); }
+  .stage { background: var(--code-bg); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); border: 1px solid color-mix(in srgb, var(--line) 50%, transparent); }
+  .stage-bar { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 16px; padding: 14px 18px; border-bottom: 1px solid var(--code-line); }
+  .rail { display: flex; align-items: center; gap: 4px; }
+  .node { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: transparent; border: 1px solid transparent; border-radius: 999px; padding: 4px 10px 4px 6px; color: rgba(221, 227, 245, .55); font: 600 0.75rem var(--font-mono); transition: all .3s var(--ease-out); }
+  .node i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--c, var(--c-unknown)); transition: background .3s; }
+  .node:hover { color: var(--code-fg); }
+  .node[aria-selected="true"] { color: var(--code-fg); border-color: rgba(221, 227, 245, .18); background: rgba(255, 255, 255, .05); }
+  .node[aria-selected="true"] i { background: var(--c, var(--c-unknown)); }
+  .meter { width: 100%; height: 44px; display: block; }
+  .panels { display: grid; }
+  .panel { grid-area: 1 / 1; opacity: 0; transform: translateY(14px); transition: opacity .45s var(--ease-out), transform .55s var(--ease-out); pointer-events: none; min-width: 0; }
+  .panel.active { opacity: 1; transform: none; pointer-events: auto; }
+  .file { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 20px; font: 0.75rem var(--font-mono); color: rgba(221, 227, 245, .6); border-bottom: 1px solid var(--code-line); background: rgba(255,255,255,.02); }
+  .panel :global(.astro-code) { max-height: calc(100vh - 240px); }
+  .panel.active :global(.line.chg) { animation: flash 1.8s var(--ease-out); }
+  @keyframes flash { 0% { background: rgba(123, 147, 255, .55); } 100% { background: var(--code-chg); } }
+
+  /* ---------- Diff ---------- */
+  .diff-sec { margin-top: 96px; display: grid; gap: 18px; }
+  .diff-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .pairs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pair { cursor: pointer; font: 600 0.8125rem var(--font-mono); border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 6px 14px; transition: all .2s; }
+  .pair.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .diff { background: var(--code-bg); border-radius: 16px; overflow: hidden; }
+  .diff-stat { display: flex; gap: 14px; flex-wrap: wrap; padding: 12px 20px; font: 0.75rem var(--font-mono); color: rgba(221, 227, 245, .6); border-bottom: 1px solid var(--code-line); }
+  .diff-stat .add { color: #2DD4BF; font-weight: 600; }
+  .diff-stat .del { color: #FF6B6B; font-weight: 600; }
+  .diff-code { margin: 0; padding: 14px 0; overflow-x: auto; font: 0.8125rem/1.75 var(--font-mono); color: var(--code-fg); }
+  .diff-code code { background: none; padding: 0; display: block; min-width: max-content; font-size: inherit; }
+  .dl { display: block; padding-right: 20px; white-space: pre; animation: dl .4s var(--ease-out) both; animation-delay: calc(var(--k) * 12ms); }
+  .dl .sign { display: inline-block; width: 2.6em; text-align: center; color: rgba(221, 227, 245, .35); user-select: none; }
+  .dl.add { background: var(--code-add); }
+  .dl.add .sign { color: #2DD4BF; }
+  .dl.del { background: var(--code-del); color: rgba(221, 227, 245, .7); }
+  .dl.del .sign { color: #FF6B6B; }
+  @keyframes dl { from { opacity: 0; transform: translateX(-6px); } }
+
+  .pn { margin-top: 96px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .pn-a { display: grid; gap: 2px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); text-decoration: none; color: var(--ink); transition: border-color .2s, transform .3s var(--ease-out); }
+  .pn-a:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .pn-a.r { text-align: right; }
+  .pn-a small { color: var(--ink-3); font-size: 0.8125rem; }
+
+  @media (max-width: 900px) {
+    .summary { grid-template-columns: 1fr; }
+    .evo-grid { grid-template-columns: 1fr; }
+    .stage-wrap { display: none; }
+    .step, .step:first-child, .step:last-child { min-height: 0; padding-block: 12px; }
+    .step-card { opacity: 1; transform: none; border-radius: 16px 16px 0 0; }
+    .inline-code { display: block; border-radius: 0 0 16px 16px; overflow: hidden; background: var(--code-bg); }
+  }
+</style>
+
+<script>
+  import { gsap } from 'gsap';
+  import { ScrollTrigger } from 'gsap/ScrollTrigger';
+  import { onPage, onTheme, cssVar, reduceMotion, TIER_FN } from '../../scripts/util';
+  gsap.registerPlugin(ScrollTrigger);
+
+  onPage(() => {
+    const cleanups: (() => void)[] = [];
+
+    /* ---- 코드 diff 탭 ---- */
+    const pairs = [...document.querySelectorAll<HTMLButtonElement>('.pair')];
+    pairs.forEach((b) => b.addEventListener('click', () => {
+      pairs.forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-selected', x === b ? 'true' : 'false'); });
+      document.querySelectorAll<HTMLElement>('.diff').forEach((d) => {
+        const on = d.dataset.d === b.dataset.d;
+        d.hidden = !on;
+        if (on) d.querySelectorAll<HTMLElement>('.dl').forEach((l) => { l.style.animation = 'none'; void l.offsetWidth; l.style.animation = ''; });
+      });
+    }));
+
+    /* ---- 풀이 진화 ---- */
+    const evo = document.getElementById('evolution');
+    if (!evo) return () => cleanups.forEach((f) => f());
+    const steps = [...evo.querySelectorAll<HTMLElement>('.step')];
+    const panels = [...evo.querySelectorAll<HTMLElement>('.panel')];
+    const nodes = [...evo.querySelectorAll<HTMLButtonElement>('.node')];
+    const curve: number[] = JSON.parse(evo.dataset.curve || '[]');
+    const meter = document.getElementById('meter') as HTMLCanvasElement | null;
+    let active = -1;
+    let level = curve[0] ?? 0;
+
+    function setActive(i: number) {
+      if (i === active) return;
+      active = i;
+      steps.forEach((s, k) => s.classList.toggle('active', k === i));
+      panels.forEach((p, k) => { p.classList.toggle('active', k === i); p.setAttribute('aria-hidden', k === i ? 'false' : 'true'); });
+      nodes.forEach((n, k) => n.setAttribute('aria-selected', k === i ? 'true' : 'false'));
+    }
+    setActive(0);
+
+    // 미터: 현재 level(0=n², 1=n log n, 2=n)에 맞춰 곡선이 모핑된다
+    function drawMeter() {
+      if (!meter) return;
+      const r = meter.getBoundingClientRect(); if (!r.width) return;
+      const d = window.devicePixelRatio || 1;
+      meter.width = r.width * d; meter.height = r.height * d;
+      const c = meter.getContext('2d')!; c.setTransform(d, 0, 0, d, 0, 0);
+      const w = r.width, h = r.height, N = 30, Y = N * N;
+      c.clearRect(0, 0, w, h);
+      const fns = [TIER_FN.sq, TIER_FN.nlog, TIER_FN.lin];
+      const cols = ['--c-sq', '--c-nlog', '--c-lin'];
+      fns.forEach((f, k) => {
+        c.strokeStyle = cssVar(cols[k]); c.globalAlpha = .18; c.lineWidth = 1.2; c.beginPath();
+        for (let n = 0; n <= N; n += .5) { const x = (n / N) * (w - 6) + 3, y = Math.max(3, h - 4 - (f(n) / Y) * (h - 8)); n ? c.lineTo(x, y) : c.moveTo(x, y); }
+        c.stroke();
+      });
+      c.globalAlpha = 1;
+      const lo = Math.floor(Math.min(level, 1.999)), t = level - lo;
+      const blend = (n: number) => fns[lo](n) * (1 - t) + fns[lo + 1](n) * t;
+      const col = level < .5 ? cols[0] : level < 1.5 ? cols[1] : cols[2];
+      c.strokeStyle = cssVar(col); c.lineWidth = 2.5; c.lineCap = 'round'; c.beginPath();
+      let lx = 0, ly = 0;
+      for (let n = 0; n <= N; n += .5) { const x = (n / N) * (w - 6) + 3, y = Math.max(3, h - 4 - (blend(n) / Y) * (h - 8)); n ? c.lineTo(x, y) : c.moveTo(x, y); lx = x; ly = y; }
+      c.stroke();
+      c.fillStyle = cssVar(col); c.beginPath(); c.arc(lx, ly, 3.5, 0, Math.PI * 2); c.fill();
+    }
+    drawMeter();
+    cleanups.push(onTheme(drawMeter));
+    const onResize = () => drawMeter();
+    window.addEventListener('resize', onResize);
+    cleanups.push(() => window.removeEventListener('resize', onResize));
+
+    const desktop = matchMedia('(min-width: 901px)');
+    let triggers: ScrollTrigger[] = [];
+    function setupScroll() {
+      triggers.forEach((t) => t.kill()); triggers = [];
+      if (!desktop.matches) { steps.forEach((s) => s.classList.add('active')); return; }
+      steps.forEach((s, i) => {
+        triggers.push(ScrollTrigger.create({
+          trigger: s, start: 'top 55%', end: 'bottom 55%',
+          onToggle: (self) => { if (self.isActive) setActive(i); },
+        }));
+      });
+      // 스크롤 진행도에 따라 곡선을 부드럽게 모핑
+      const list = evo!.querySelector('.steps')!;
+      const proxy = { v: curve[0] ?? 0 };
+      triggers.push(ScrollTrigger.create({
+        trigger: list, start: 'top 55%', end: 'bottom 55%', scrub: reduceMotion() ? false : 0.6,
+        onUpdate: (self) => {
+          const f = self.progress * (curve.length - 1);
+          const k = Math.min(curve.length - 2, Math.floor(f));
+          const target = curve.length > 1 ? curve[k] + (curve[k + 1] - curve[k]) * Math.min(1, Math.max(0, (f - k - 0.35) / 0.3)) : curve[0];
+          gsap.to(proxy, { v: target, duration: reduceMotion() ? 0 : 0.5, overwrite: true, onUpdate: () => { level = proxy.v; drawMeter(); } });
+        },
+      }));
+      ScrollTrigger.refresh();
+    }
+    setupScroll();
+    desktop.addEventListener('change', setupScroll);
+    cleanups.push(() => { desktop.removeEventListener('change', setupScroll); triggers.forEach((t) => t.kill()); });
+
+    nodes.forEach((n) => n.addEventListener('click', () => {
+      const i = Number(n.dataset.go);
+      const s = steps[i];
+      const y = s.getBoundingClientRect().top + window.scrollY - window.innerHeight * 0.3;
+      window.scrollTo({ top: y, behavior: reduceMotion() ? 'auto' : 'smooth' });
+    }));
+
+    // 단계 카드 등장 효과
+    if (!reduceMotion()) {
+      const tw = gsap.from('.ph > :not(h1)', { y: 18, opacity: 0, duration: .7, stagger: .06, ease: 'power3.out', clearProps: 'all' });
+      cleanups.push(() => tw.kill());
+    }
+
+    return () => cleanups.forEach((f) => f());
+  });
+</script>

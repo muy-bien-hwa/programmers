@@ -1,0 +1,221 @@
+---
+import type { Problem } from '../lib/problems';
+interface Props { featured: Problem | null; }
+const { featured } = Astro.props;
+const trace = featured
+  ? featured.solutions.map((s) => ({ i: s.index, tier: s.tier, c: s.complexity ?? '미기재' }))
+  : [];
+---
+<figure class="plot" data-trace={JSON.stringify(trace)} data-title={featured?.title ?? ''}>
+  <canvas id="hero-canvas" aria-hidden="true"></canvas>
+  <div class="legend">
+    <span><i style="background:var(--c-sq)"></i>O(n²)</span>
+    <span><i style="background:var(--c-nlog)"></i>O(n log n)</span>
+    <span><i style="background:var(--c-lin)"></i>O(n)</span>
+  </div>
+  <div class="readout" id="hero-readout" aria-live="polite">
+    <div class="ro-n"><span>n</span><b id="ro-n">3,000,000</b></div>
+    <div class="ro-row t-sq"><span>O(n²)</span><b id="ro-sq">9조</b></div>
+    <div class="ro-row t-nlog"><span>O(n log n)</span><b id="ro-nlog">6,500만</b></div>
+    <div class="ro-row t-lin"><span>O(n)</span><b id="ro-lin">300만</b></div>
+  </div>
+  <figcaption>
+    {featured
+      ? <>점은 같은 입력 크기에서 본 <b>{featured.title}</b> 풀이별 복잡도다. 그래프 위에서 마우스를 움직이면 입력 크기별 연산 횟수가 바뀐다. 오른쪽 끝이 이 문제의 최대 입력 300만 자리.</>
+      : <>그래프 위에서 마우스를 움직이면 입력 크기별 연산 횟수가 바뀐다.</>}
+  </figcaption>
+</figure>
+
+<style>
+  .plot { position: relative; margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; box-shadow: var(--shadow); }
+  canvas { display: block; width: 100%; height: clamp(260px, 36vw, 420px); cursor: crosshair; touch-action: pan-y; }
+  .legend { position: absolute; left: 22px; top: 18px; display: flex; gap: 16px; flex-wrap: wrap; font: 500 0.8125rem var(--font-mono); color: var(--ink-2); pointer-events: none; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .legend i { width: 16px; height: 3px; border-radius: 2px; }
+  .readout {
+    position: absolute; right: 18px; top: 16px; display: grid; gap: 2px; min-width: 190px;
+    font: 0.75rem/1.6 var(--font-mono); background: color-mix(in srgb, var(--surface) 88%, transparent);
+    border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; pointer-events: none;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .readout div { display: flex; justify-content: space-between; gap: 14px; }
+  .readout span { color: var(--ink-3); }
+  .readout b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ro-n { border-bottom: 1px solid var(--line); padding-bottom: 4px; margin-bottom: 2px; }
+  .ro-n b { color: var(--ink); }
+  .ro-row b { color: var(--c); }
+  figcaption { padding: 12px 22px 16px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 0.8125rem; }
+  figcaption b { color: var(--ink-2); font-weight: 600; }
+  @media (max-width: 640px) {
+    .readout { position: static; margin: 0 14px 12px; min-width: 0; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+    .ro-n { grid-column: 1 / -1; }
+    .legend { left: 14px; top: 12px; gap: 10px; font-size: 0.75rem; }
+  }
+</style>
+
+<script>
+  import { onPage, onTheme, cssVar, reduceMotion, koNum, TIER_VAR, TIER_FN } from '../scripts/util';
+
+  onPage(() => {
+    const fig = document.querySelector<HTMLElement>('.plot[data-trace]');
+    const cv = document.getElementById('hero-canvas') as HTMLCanvasElement | null;
+    if (!fig || !cv) return;
+    const ctx = cv.getContext('2d')!;
+    const trace: { i: number; tier: string; c: string }[] = JSON.parse(fig.dataset.trace || '[]');
+    const ro = {
+      n: document.getElementById('ro-n')!, sq: document.getElementById('ro-sq')!,
+      nlog: document.getElementById('ro-nlog')!, lin: document.getElementById('ro-lin')!,
+    };
+
+    const NMAX = 40, SCALE = 75000; // 40 * 75,000 = 3,000,000 (숫자 짝꿍 최대 입력)
+    const YMAX = NMAX * NMAX * 0.36;
+    const curves = [
+      { f: TIER_FN.sq, v: '--c-sq' },
+      { f: TIER_FN.nlog, v: '--c-nlog' },
+      { f: TIER_FN.lin, v: '--c-lin' },
+    ];
+    let W = 0, H = 0, raf = 0, start = 0;
+    let t = reduceMotion() ? 1 : 0;      // 곡선 그리기 진행도
+    let tt = reduceMotion() ? 1 : 0;     // 풀이 궤적 진행도
+    let mouseN: number | null = null;
+    const pad = () => ({ l: W < 640 ? 34 : 54, r: W < 640 ? 16 : 28, t: W < 640 ? 44 : 64, b: 40 });
+    let P = pad();
+    const px = (n: number) => P.l + (n / NMAX) * (W - P.l - P.r);
+    const py = (v: number) => H - P.b - Math.min(v / YMAX, 1.06) * (H - P.t - P.b);
+
+    function size() {
+      const r = cv!.getBoundingClientRect(); const d = window.devicePixelRatio || 1;
+      W = r.width; H = r.height; cv!.width = Math.round(W * d); cv!.height = Math.round(H * d);
+      ctx.setTransform(d, 0, 0, d, 0, 0); P = pad();
+    }
+
+    // 같은 입력 크기 n에서 각 풀이의 복잡도를 찍는다. 복잡도가 같은 연속 풀이는 한 점으로 묶는다.
+    const TN = NMAX * 0.56;
+    const groups: { tier: string; label: string }[] = [];
+    trace.forEach((s) => {
+      const g = groups[groups.length - 1];
+      if (g && g.tier === s.tier) g.label += `·S${s.i}`;
+      else groups.push({ tier: s.tier, label: `S${s.i}` });
+    });
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      const ink2 = cssVar('--ink-3'), line = cssVar('--line');
+      // 축과 눈금
+      ctx.strokeStyle = line; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(P.l, P.t - 14); ctx.lineTo(P.l, H - P.b); ctx.lineTo(W - P.r, H - P.b); ctx.stroke();
+      ctx.fillStyle = ink2; ctx.font = '11px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+      [0, 1_000_000, 2_000_000, 3_000_000].forEach((v) => {
+        const x = px(v / SCALE);
+        ctx.beginPath(); ctx.moveTo(x, H - P.b); ctx.lineTo(x, H - P.b + 4); ctx.stroke();
+        ctx.fillText(v === 0 ? '0' : `${v / 1_000_000}00만`, x, H - P.b + 18);
+      });
+      ctx.textAlign = 'left';
+
+      // 곡선
+      const nEnd = NMAX * easeOut(t);
+      curves.forEach((c) => {
+        ctx.strokeStyle = cssVar(c.v); ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath();
+        for (let n = 0; n <= nEnd; n += 0.2) {
+          const y = py(c.f(n)); if (y < P.t - 16) break;
+          n === 0 ? ctx.moveTo(px(n), y) : ctx.lineTo(px(n), y);
+        }
+        ctx.stroke();
+      });
+
+      // 풀이 궤적
+      if (trace.length && tt > 0) {
+        const pts = groups.map((g) => ({ x: px(TN), y: py(TIER_FN[g.tier](TN)), s: g }));
+        const shown = tt * (pts.length - 1 || 1);
+        ctx.setLineDash([5, 5]); ctx.strokeStyle = cssVar('--ink-2'); ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+        for (let k = 1; k < pts.length; k++) {
+          const f = Math.min(1, Math.max(0, shown - (k - 1)));
+          if (f <= 0) break;
+          ctx.lineTo(pts[k - 1].x + (pts[k].x - pts[k - 1].x) * f, pts[k - 1].y + (pts[k].y - pts[k - 1].y) * f);
+        }
+        ctx.stroke(); ctx.setLineDash([]);
+        pts.forEach((p, k) => {
+          const a = Math.min(1, Math.max(0, (shown - k + 1) * 1.4));
+          if (a <= 0) return;
+          ctx.globalAlpha = a;
+          const col = cssVar(TIER_VAR[p.s.tier]);
+          if (k > 0) { // 화살촉
+            const pr = pts[k - 1];
+            if (Math.abs(pr.y - p.y) > 24) {
+              const dir = Math.sign(p.y - pr.y);
+              ctx.fillStyle = cssVar('--ink-2'); ctx.beginPath();
+              ctx.moveTo(p.x, p.y - dir * 11); ctx.lineTo(p.x - 5, p.y - dir * 19); ctx.lineTo(p.x + 5, p.y - dir * 19); ctx.closePath(); ctx.fill();
+            }
+          }
+          ctx.fillStyle = cssVar('--surface'); ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke();
+          ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = cssVar('--ink'); ctx.font = '600 11px "JetBrains Mono", monospace';
+          const label = p.s.label;
+          ctx.textAlign = 'left';
+          ctx.fillText(label, p.x + 14, p.y + 4);
+          ctx.globalAlpha = 1;
+        });
+      }
+
+      // 마우스 커서
+      if (mouseN !== null) {
+        const x = px(mouseN);
+        ctx.strokeStyle = cssVar('--accent'); ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x, P.t - 14); ctx.lineTo(x, H - P.b); ctx.stroke(); ctx.setLineDash([]);
+        curves.forEach((c) => {
+          const y = py(c.f(mouseN!)); if (y < P.t - 16) return;
+          ctx.fillStyle = cssVar(c.v); ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill();
+        });
+      }
+    }
+
+    const easeOut = (x: number) => 1 - Math.pow(1 - x, 3);
+
+    function readout(n: number) {
+      const real = Math.max(1, n * SCALE);
+      ro.n.textContent = Math.round(real).toLocaleString('ko-KR');
+      ro.sq.textContent = koNum(real * real);
+      ro.nlog.textContent = koNum(real * Math.log2(real));
+      ro.lin.textContent = koNum(real);
+    }
+
+    function loop(ts: number) {
+      if (!start) start = ts;
+      const el = (ts - start) / 1000;
+      t = Math.min(1, el / 1.6);
+      tt = Math.min(1, Math.max(0, (el - 1.5) / 1.4));
+      draw();
+      if (tt < 1) raf = requestAnimationFrame(loop);
+    }
+
+    function onMove(e: PointerEvent) {
+      const r = cv!.getBoundingClientRect();
+      const n = ((e.clientX - r.left - P.l) / (W - P.l - P.r)) * NMAX;
+      mouseN = Math.max(0.02, Math.min(NMAX, n));
+      readout(mouseN); if (tt >= 1) draw();
+    }
+    function onLeave() { mouseN = null; readout(NMAX); if (tt >= 1) draw(); }
+    const onResize = () => { size(); draw(); };
+
+    size(); readout(NMAX); draw();
+    // 화면에 보일 때 그리기 시작
+    const io = new IntersectionObserver((es) => {
+      if (es[0].isIntersecting && t === 0) { raf = requestAnimationFrame(loop); io.disconnect(); }
+    });
+    if (t === 0) io.observe(cv);
+
+    cv.addEventListener('pointermove', onMove);
+    cv.addEventListener('pointerleave', onLeave);
+    window.addEventListener('resize', onResize);
+    const offTheme = onTheme(draw);
+    if (document.fonts) document.fonts.ready.then(draw);
+
+    return () => {
+      cancelAnimationFrame(raf); io.disconnect(); offTheme();
+      window.removeEventListener('resize', onResize);
+    };
+  });
+</script>
