@@ -17,6 +17,7 @@ solutions:
     complexity: O(n log n)
     result: 통과
 ---
+# 숫자 짝꿍
 
 ## 문제 설명
 

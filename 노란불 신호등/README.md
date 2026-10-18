@@ -1,3 +1,20 @@
+---
+title: 노란불 신호등
+level: 2
+link: https://school.programmers.co.kr/learn/courses/30/lessons/468371
+solved: 2026-10-18
+tags: [구현, 시뮬레이션, 최소공배수]
+summary: |
+  초록불 → 노란불 → 빨간불을 반복하는 신호등이 최대 5개 있고, 신호등마다 각 색의 지속 시간이 다르다. 1초부터 모두 초록불로 시작할 때, 모든 신호등이 동시에 노란불이 되는 가장 빠른 시각을 구한다.
+  그런 순간이 영원히 오지 않으면 -1을 돌려준다. 신호등 하나의 주기는 최대 20초지만 전체가 같은 상태로 돌아오기까지는 훨씬 길어서, 언제 반복을 멈출지가 관건이다.
+solutions:
+  solution_1:
+    complexity: O(n·L), 해가 없으면 무한 루프
+  solution_2:
+    complexity: O(n·L)
+    result: 통과
+---
+
 # 노란불 신호등 (2025 카카오 하반기 1차)
  
 ## 문제 설명
