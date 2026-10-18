@@ -1,6 +1,6 @@
 ---
 title: 노란불 신호등
-level: 2
+level: 1
 link: https://school.programmers.co.kr/learn/courses/30/lessons/468371
 solved: 2026-10-18
 tags: [구현, 시뮬레이션, 최소공배수]
