@@ -1,19 +1,20 @@
 ---
-/** 최근 26주 풀이 잔디. 날짜별 풀이 파일 수. */
+/** 최근 N주 풀이 잔디. 날짜별 풀이 파일 수(커밋 날짜 기준). */
 interface Props { data: Map<string, number>; weeks?: number; }
-const { data, weeks = 53 } = Astro.props;
+const { data, weeks = 26 } = Astro.props;
 const today = new Date();
 today.setUTCHours(0, 0, 0, 0);
 const end = new Date(today);
 end.setUTCDate(end.getUTCDate() + (6 - end.getUTCDay())); // 이번 주 토요일
+const start = new Date(end); start.setUTCDate(end.getUTCDate() - (weeks * 7 - 1));
 const days: { d: string; n: number; future: boolean }[] = [];
 for (let i = weeks * 7 - 1; i >= 0; i--) {
   const dt = new Date(end); dt.setUTCDate(end.getUTCDate() - i);
   const d = dt.toISOString().slice(0, 10);
   days.push({ d, n: data.get(d) ?? 0, future: dt > today });
 }
-const total = [...data.values()].reduce((a, b) => a + b, 0);
-const activeDays = [...data.keys()].length;
+const inRange = days.filter((x) => x.n > 0);
+const total = inRange.reduce((a, x) => a + x.n, 0);
 const lvl = (n: number) => (n === 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : n <= 4 ? 3 : 4);
 const months: { col: number; label: string }[] = [];
 days.forEach((x, i) => {
@@ -22,40 +23,45 @@ days.forEach((x, i) => {
     if (!months.length || months[months.length - 1].label !== `${m}월`) months.push({ col: i / 7, label: `${m}월` });
   }
 });
+// 바로 다음 달 라벨과 2주 안쪽으로 붙으면 앞 라벨은 뺀다 (글자가 겹치지 않게)
+const monthLabels = months.filter((m, i) => !months[i + 1] || months[i + 1].col - m.col >= 2);
+const fmt = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일`;
 ---
-<div class="heat">
-  <div class="head">
-    <span>최근 {weeks}주 동안 풀이 {total}개 · 활동한 날 {activeDays}일</span>
+<figure class="heat">
+  <figcaption class="head">
+    <b>최근 {weeks}주 동안 풀이 {total}개 · 활동한 날 {inRange.length}일</b>
     <span class="scale" aria-hidden="true">적음 <i class="l0"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i> 많음</span>
+  </figcaption>
+  <div class="months" style={`grid-template-columns: repeat(${weeks}, minmax(0, 1fr))`} aria-hidden="true">
+    {monthLabels.map((m) => <span style={`grid-column: ${m.col + 1}; grid-row: 1`}>{m.label}</span>)}
   </div>
-  <div class="scroll">
-    <div class="months" style={`grid-template-columns: repeat(${weeks}, 1fr)`}>
-      {months.map((m) => <span style={`grid-column: ${m.col + 1}`}>{m.label}</span>)}
-    </div>
-    <div class="grid" style={`grid-template-columns: repeat(${weeks}, 1fr)`} role="img" aria-label={`최근 ${weeks}주 풀이 기록`}>
-      {days.map((x, i) => (
-        <i class={`c l${lvl(x.n)}${x.future ? ' fut' : ''}`} style={`--i:${i}`} title={x.future ? '' : `${x.d} · 풀이 ${x.n}개`} />
-      ))}
-    </div>
+  <div class="grid" style={`grid-template-columns: repeat(${weeks}, minmax(0, 1fr))`} aria-hidden="true">
+    {days.map((x, i) => (
+      <i class={`c l${lvl(x.n)}${x.future ? ' fut' : ''}`} style={`--i:${i}`} title={x.future ? '' : `${x.d} · 풀이 ${x.n}개`} />
+    ))}
   </div>
-</div>
+  <ul class="sr-only">
+    {inRange.length ? inRange.map((x) => <li>{fmt(x.d)} 풀이 {x.n}개</li>) : <li>최근 {weeks}주 동안 푼 기록이 없다</li>}
+  </ul>
+</figure>
 
 <style>
-  .heat { display: grid; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; min-width: 0; }
-  .head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 0.875rem; color: var(--ink-2); }
-  .scale { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--ink-3); }
+  .heat { margin: 0; display: grid; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; min-width: 0; box-shadow: var(--shadow); }
+  .head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px 12px; flex-wrap: wrap; font-size: 0.875rem; color: var(--ink-2); }
+  .head b { font-weight: 600; color: var(--ink); }
+  .scale { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8125rem; color: var(--ink-3); }
   .scale i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
-  .scroll { overflow-x: auto; display: grid; gap: 6px; }
-  .months { display: grid; gap: 4px; min-width: 640px; font: 0.6875rem var(--font-mono); color: var(--ink-3); }
-  .grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; min-width: 640px; }
-  .c { aspect-ratio: 1; border-radius: 3px; display: block; max-width: 100%;
-       animation: pop .5s var(--ease-out) both; animation-delay: calc(var(--i) * 4ms); }
+  .months { display: grid; column-gap: 3px; overflow: visible; font-size: 0.8125rem; color: var(--ink-3); white-space: nowrap; }
+  .grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, auto); gap: 3px; }
+  .c { aspect-ratio: 1; border-radius: 3px; display: block;
+       animation: pop .5s var(--ease-out) both; animation-delay: calc(var(--i) * 3ms); }
+  /* 잔디는 초록. 복잡도 teal(O(n) 이하)과 헷갈리지 않게 노란 기운이 도는 초록을 쓴다 */
   .l0 { background: var(--heat-0); }
-  .l1 { background: color-mix(in srgb, var(--c-lin) 35%, var(--heat-0)); }
-  .l2 { background: color-mix(in srgb, var(--c-lin) 60%, var(--heat-0)); }
-  .l3 { background: color-mix(in srgb, var(--c-lin) 82%, var(--heat-0)); }
-  .l4 { background: var(--c-lin); }
-  .fut { opacity: .35; }
+  .l1 { background: color-mix(in srgb, var(--heat) 35%, var(--heat-0)); }
+  .l2 { background: color-mix(in srgb, var(--heat) 60%, var(--heat-0)); }
+  .l3 { background: color-mix(in srgb, var(--heat) 82%, var(--heat-0)); }
+  .l4 { background: var(--heat); }
+  .fut { opacity: .35; animation: none; }
   @keyframes pop { from { transform: scale(.4); opacity: .2; } to { transform: scale(1); opacity: 1; } }
-  .fut { animation: none; }
+  @media (max-width: 640px) { .heat { padding: 14px; } .grid, .months { gap: 2px; } }
 </style>
