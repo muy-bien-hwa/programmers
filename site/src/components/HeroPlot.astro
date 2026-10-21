@@ -7,49 +7,62 @@ const trace = featured
   : [];
 ---
 <figure class="plot" data-trace={JSON.stringify(trace)} data-title={featured?.title ?? ''}>
-  <canvas id="hero-canvas" aria-hidden="true"></canvas>
-  <div class="legend">
-    <span><i style="background:var(--c-sq)"></i>O(n²)</span>
-    <span><i style="background:var(--c-nlog)"></i>O(n log n)</span>
-    <span><i style="background:var(--c-lin)"></i>O(n)</span>
+  {featured && (
+    <div class="cap-top">
+      <b>{featured.title} · 풀이 {featured.solutions.length}개</b>
+      <span class="hint">그래프 위에서 움직이면 n이 바뀐다</span>
+    </div>
+  )}
+  <div class="stage">
+    <canvas id="hero-canvas" aria-hidden="true"></canvas>
+    <div class="readout" id="hero-readout" aria-live="polite">
+      <div class="ro-n"><span>n</span><b id="ro-n">3,000,000</b></div>
+      <div class="ro-row t-sq"><span>O(n²)</span><b id="ro-sq">9조</b></div>
+      <div class="ro-row t-nlog"><span>O(n log n)</span><b id="ro-nlog">6,500만</b></div>
+      <div class="ro-row t-lin"><span>O(n)</span><b id="ro-lin">300만</b></div>
+    </div>
   </div>
-  <div class="readout" id="hero-readout" aria-live="polite">
-    <div class="ro-n"><span>n</span><b id="ro-n">3,000,000</b></div>
-    <div class="ro-row t-sq"><span>O(n²)</span><b id="ro-sq">9조</b></div>
-    <div class="ro-row t-nlog"><span>O(n log n)</span><b id="ro-nlog">6,500만</b></div>
-    <div class="ro-row t-lin"><span>O(n)</span><b id="ro-lin">300만</b></div>
+  <div class="legend">
+    <span><i style="background:var(--c-lin)"></i>O(n) 이하</span>
+    <span><i style="background:var(--c-nlog)"></i>O(n log n)</span>
+    <span><i style="background:var(--c-sq)"></i>O(n²) 이상</span>
   </div>
   <figcaption>
     {featured
-      ? <>점은 같은 입력 크기에서 본 <b>{featured.title}</b> 풀이별 복잡도다. 그래프 위에서 마우스를 움직이면 입력 크기별 연산 횟수가 바뀐다. 오른쪽 끝이 이 문제의 최대 입력 300만 자리.</>
+      ? <>점은 같은 입력 크기에서 본 <b>{featured.title}</b> 풀이별 복잡도다. 오른쪽 끝이 이 문제의 최대 입력 300만 자리이고, 그래프 위쪽을 넘는 값은 잘라서 그렸다.</>
       : <>그래프 위에서 마우스를 움직이면 입력 크기별 연산 횟수가 바뀐다.</>}
   </figcaption>
 </figure>
 
 <style>
-  .plot { position: relative; margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; box-shadow: var(--shadow); }
-  canvas { display: block; width: 100%; height: clamp(260px, 36vw, 420px); cursor: crosshair; touch-action: pan-y; }
-  .legend { position: absolute; left: 22px; top: 18px; display: flex; gap: 16px; flex-wrap: wrap; font: 500 0.8125rem var(--font-mono); color: var(--ink-2); pointer-events: none; }
+  .plot { position: relative; margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 16px 18px 14px; display: grid; gap: 10px; min-width: 0; }
+  .cap-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .cap-top b { font-size: 0.9375rem; font-weight: 700; }
+  .hint { font-size: 0.8125rem; color: var(--ink-3); }
+  .stage { position: relative; }
+  canvas { display: block; width: 100%; height: clamp(240px, 26vw, 320px); cursor: crosshair; touch-action: pan-y; }
+  .legend { display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: 0.84375rem; color: var(--ink-2); }
   .legend span { display: inline-flex; align-items: center; gap: 7px; }
   .legend i { width: 16px; height: 3px; border-radius: 2px; }
   .readout {
-    position: absolute; right: 18px; top: 16px; display: grid; gap: 2px; min-width: 190px;
-    font: 0.75rem/1.6 var(--font-mono); background: color-mix(in srgb, var(--surface) 88%, transparent);
-    border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; pointer-events: none;
+    position: absolute; left: 60px; top: 0; display: grid; gap: 1px; min-width: 176px;
+    font: 0.8125rem/1.55 var(--font-mono); background: color-mix(in srgb, var(--surface) 90%, transparent);
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; pointer-events: none;
     backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   }
   .readout div { display: flex; justify-content: space-between; gap: 14px; }
   .readout span { color: var(--ink-3); }
   .readout b { font-weight: 600; font-variant-numeric: tabular-nums; }
-  .ro-n { border-bottom: 1px solid var(--line); padding-bottom: 4px; margin-bottom: 2px; }
+  .ro-n { border-bottom: 1px solid var(--line); padding-bottom: 3px; margin-bottom: 2px; }
   .ro-n b { color: var(--ink); }
-  .ro-row b { color: var(--c); }
-  figcaption { padding: 12px 22px 16px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 0.8125rem; }
-  figcaption b { color: var(--ink-2); font-weight: 600; }
+  .ro-row b { color: var(--ct); }
+  figcaption { padding-top: 10px; border-top: 1px solid var(--line); color: var(--ink-2); font-size: 0.875rem; line-height: 1.6; }
+  figcaption b { color: var(--ink); font-weight: 600; }
+  .hint, figcaption { text-wrap: pretty; }
   @media (max-width: 640px) {
-    .readout { position: static; margin: 0 14px 12px; min-width: 0; grid-template-columns: 1fr 1fr; column-gap: 16px; }
-    .ro-n { grid-column: 1 / -1; }
-    .legend { left: 14px; top: 12px; gap: 10px; font-size: 0.75rem; }
+    .plot { padding: 14px; }
+    .hint, .readout { display: none; }
+    canvas { height: 210px; }
   }
 </style>
 
@@ -78,7 +91,7 @@ const trace = featured
     let t = reduceMotion() ? 1 : 0;      // 곡선 그리기 진행도
     let tt = reduceMotion() ? 1 : 0;     // 풀이 궤적 진행도
     let mouseN: number | null = null;
-    const pad = () => ({ l: W < 640 ? 34 : 54, r: W < 640 ? 16 : 28, t: W < 640 ? 44 : 64, b: 40 });
+    const pad = () => ({ l: W < 480 ? 30 : 44, r: W < 480 ? 20 : 22, t: W < 480 ? 16 : 20, b: 30 });
     let P = pad();
     const px = (n: number) => P.l + (n / NMAX) * (W - P.l - P.r);
     const py = (v: number) => H - P.b - Math.min(v / YMAX, 1.06) * (H - P.t - P.b);
@@ -104,7 +117,7 @@ const trace = featured
       // 축과 눈금
       ctx.strokeStyle = line; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(P.l, P.t - 14); ctx.lineTo(P.l, H - P.b); ctx.lineTo(W - P.r, H - P.b); ctx.stroke();
-      ctx.fillStyle = ink2; ctx.font = '11px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+      ctx.fillStyle = ink2; ctx.font = '12px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
       [0, 1_000_000, 2_000_000, 3_000_000].forEach((v) => {
         const x = px(v / SCALE);
         ctx.beginPath(); ctx.moveTo(x, H - P.b); ctx.lineTo(x, H - P.b + 4); ctx.stroke();
@@ -152,7 +165,7 @@ const trace = featured
           ctx.fillStyle = cssVar('--surface'); ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2); ctx.fill();
           ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.stroke();
           ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = cssVar('--ink'); ctx.font = '600 11px "JetBrains Mono", monospace';
+          ctx.fillStyle = cssVar('--ink'); ctx.font = '600 12.5px "JetBrains Mono", monospace';
           const label = p.s.label;
           ctx.textAlign = 'left';
           ctx.fillText(label, p.x + 14, p.y + 4);

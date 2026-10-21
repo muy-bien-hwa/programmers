@@ -43,6 +43,8 @@ export interface Problem {
   solved: string | null;
   solutions: Solution[];
   examples: Example[];
+  /** 입출력 예 표의 머리 (예: X, Y, result) */
+  exampleHeads: string[];
   final: Solution | null;
   /** 큰 입력 벤치마크용 Python 식. n을 쓸 수 있다. 예: (rand_digits(n), rand_digits(n)) */
   bench: string | null;
@@ -123,6 +125,7 @@ function splitReadme(body: string) {
   return { problemText, sections };
 }
 
+let lastHeads: string[] = [];
 /** 원문의 "입출력 예" 표에서 실행용 예제를 뽑는다. 화면에는 값만 표로 보여준다. */
 function parseExamples(problemText: string): Example[] {
   const at = problemText.search(/^##\s*입출력\s*예\s*$/m);
@@ -135,6 +138,7 @@ function parseExamples(problemText: string): Example[] {
   for (const l of after.slice(startIdx)) { if (!l.trim().startsWith('|')) break; rows.push(l); }
   if (rows.length < 3) return [];
   const cells = (r: string) => r.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim().replace(/^`|`$/g, ''));
+  lastHeads = cells(rows[0]);
   return rows.slice(2).map((r) => {
     const c = cells(r);
     return { args: c.slice(0, -1), expected: c[c.length - 1] };
@@ -210,6 +214,9 @@ export function getProblems(): Problem[] {
       });
     });
 
+    lastHeads = [];
+    const examples = parseExamples(problemText);
+    const exampleHeads = examples.length ? lastHeads : [];
     const summary = typeof data.summary === 'string' ? data.summary.trim() : '';
     const dates = solutions.map((s) => s.date).filter(Boolean) as string[];
     problems.push({
@@ -223,7 +230,8 @@ export function getProblems(): Problem[] {
       summaryText: summary,
       solved: toISO(data.solved) ?? dates.sort().at(-1) ?? null,
       solutions,
-      examples: parseExamples(problemText),
+      examples,
+      exampleHeads,
       final: solutions.at(-1) ?? null,
       bench: typeof data.bench === 'string' ? data.bench : null,
       benchSizes: Array.isArray(data.bench_sizes) ? data.bench_sizes.map(Number) : [1000, 10000, 100000],
@@ -233,6 +241,43 @@ export function getProblems(): Problem[] {
   problems.sort((a, b) => (b.solved ?? '').localeCompare(a.solved ?? ''));
   cache = problems;
   return problems;
+}
+
+const RANK: Record<Tier, number> = { sq: 3, nlog: 2, lin: 1, unknown: 0 };
+
+/** 풀이 하나의 결과 표시. result가 있으면 그것을, 없고 문제점이 있으면 "개선 필요". */
+export type VerdictKind = 'ok' | 'fail' | 'warn' | 'none';
+export function verdictOf(s: Solution): { kind: VerdictKind; text: string } {
+  if (s.result) {
+    const ok = /통과|정답|pass|accepted/i.test(s.result);
+    return { kind: ok ? 'ok' : 'fail', text: s.result };
+  }
+  if (s.issueHtml) return { kind: 'warn', text: '개선 필요' };
+  return { kind: 'none', text: '' };
+}
+
+/** 복잡도 표기에서 Big-O 부분만 (뒤에 붙은 설명은 뺀다). "O(n·L), 해가 없으면…" → "O(n·L)" */
+export function bigO(s: Solution | null | undefined): string {
+  if (!s?.complexity) return '미기재';
+  return s.complexity.split(/[,，]/)[0].trim();
+}
+
+/** 복잡도가 실제로 낮아졌는지 */
+export function lowered(p: Problem): boolean {
+  const a = p.solutions[0], b = p.final;
+  return !!(a && b && a !== b && RANK[b.tier] > 0 && RANK[a.tier] > RANK[b.tier]);
+}
+
+/** 카드·상세에 쓰는 "이야기" 요약: 라벨과 처음 → 마지막 문구 */
+export function storyOf(p: Problem): { label: string; text: string } {
+  const a = p.solutions[0], b = p.final;
+  if (!a || !b) return { label: '풀이 없음', text: '' };
+  if (a === b) return { label: '풀이 1개', text: bigO(b) };
+  if (lowered(p)) return { label: '복잡도 개선', text: `${bigO(a)} → ${bigO(b)}` };
+  const va = verdictOf(a), vb = verdictOf(b);
+  if (va.kind === 'fail' && vb.kind === 'ok') return { label: '정확성 개선', text: `${va.text} → ${vb.text}` };
+  if (vb.text) return { label: '풀이 개선', text: `${va.text || bigO(a)} → ${vb.text}` };
+  return { label: '풀이 개선', text: `${bigO(a)} → ${bigO(b)}` };
 }
 
 /** 잔디 히트맵용: 날짜별 풀이 파일 수 */

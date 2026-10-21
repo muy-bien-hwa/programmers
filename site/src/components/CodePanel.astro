@@ -1,0 +1,97 @@
+---
+/** 풀이 하나의 코드 패널. "전체 코드"와 "이전 풀이와 비교"를 한 패널 안에서 바꿔 본다.
+ *  (예전의 진화 구간 코드 + 아래 diff 구역을 하나로 합친 것) */
+import { Code } from 'astro:components';
+import { diffLines } from 'diff';
+import Icon from './Icon.astro';
+import type { Solution } from '../lib/problems';
+interface Props { s: Solution; prev?: Solution; }
+const { s, prev } = Astro.props;
+
+const chg = {
+  name: 'mark-changed',
+  line(this: any, node: any, line: number) {
+    if (s.changedLines.includes(line)) this.addClassToHast(node, 'chg');
+  },
+};
+
+type Row = { t: 'add' | 'del' | 'same'; text: string };
+let rows: Row[] = [];
+let add = 0, del = 0;
+if (prev) {
+  for (const part of diffLines(prev.code + '\n', s.code + '\n')) {
+    const lines = part.value.replace(/\n$/, '').split('\n');
+    for (const l of lines) rows.push({ t: part.added ? 'add' : part.removed ? 'del' : 'same', text: l });
+  }
+  add = rows.filter((r) => r.t === 'add').length;
+  del = rows.filter((r) => r.t === 'del').length;
+}
+const diffT = {
+  name: 'mark-diff',
+  pre(this: any, node: any) { this.addClassToHast(node, 'diffv'); },
+  line(this: any, node: any, line: number) {
+    const r = rows[line - 1]; if (!r) return;
+    if (r.t !== 'same') this.addClassToHast(node, r.t);
+    node.properties['data-sign'] = r.t === 'add' ? '+' : r.t === 'del' ? '−' : ' ';
+  },
+};
+const lineCount = s.code.split('\n').length;
+const LONG = 22; // 모바일에서 이보다 길면 접는다
+---
+<div class="cp" data-cp>
+  <div class="bar">
+    <span class="file">{s.file}</span>
+    <span class="meta">{prev ? `S${prev.index} 대비 ${s.changedLines.length}줄 변경` : '첫 풀이'}</span>
+    <span class="act">
+      {prev && (
+        <span class="vseg" role="group" aria-label="코드 보기 방식">
+          <button type="button" data-view="full" aria-pressed="true">전체 코드</button>
+          <button type="button" data-view="diff" aria-pressed="false">이전 풀이와 비교</button>
+        </span>
+      )}
+      <button type="button" class="copy" data-copy aria-label="코드 복사"><Icon name="copy" size={16} /></button>
+    </span>
+  </div>
+  <div class={`clip${lineCount > LONG ? ' long' : ''}`}>
+    <div class="v-full" data-v="full">
+      <Code code={s.code} lang="python" theme="tokyo-night" transformers={[chg]} />
+    </div>
+    {prev && (
+      <div class="v-diff" data-v="diff" hidden>
+        <p class="dstat"><b class="a">+{add}</b> 줄 추가 · <b>−{del}</b> 줄 삭제 · solution_{prev.index}.py → {s.file}</p>
+        <Code code={rows.map((r) => r.text).join('\n')} lang="python" theme="tokyo-night" transformers={[diffT]} />
+      </div>
+    )}
+  </div>
+  {lineCount > LONG && (
+    <div class="more"><button type="button" data-expand aria-expanded="false">코드 전체 보기 · {lineCount}줄<Icon name="down" size={16} /></button></div>
+  )}
+</div>
+
+<style>
+  .cp { background: var(--code-bg); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); min-width: 0; }
+  .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; padding: 10px 12px 10px 16px; background: var(--code-bar); border-bottom: 1px solid var(--code-line); }
+  .file { font: 0.84375rem var(--font-mono); color: var(--code-fg); }
+  .meta { font-size: 0.8125rem; color: var(--code-mute); }
+  .act { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .vseg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); }
+  .vseg button { cursor: pointer; min-height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--code-mute); font-size: 0.84375rem; font-weight: 500; }
+  .vseg button[aria-pressed="true"] { background: rgba(123, 147, 255, 0.28); color: var(--code-fg); }
+  .copy { width: 36px; height: 36px; display: inline-grid; place-items: center; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.12); background: transparent; color: var(--code-fg); cursor: pointer; }
+  .copy:hover, .vseg button:hover { color: var(--code-fg); }
+  .copy.done { border-color: var(--accent); color: var(--accent); }
+  .dstat { padding: 10px 16px 0; font-size: 0.8125rem; color: var(--code-mute); }
+  .dstat b { font-weight: 600; }
+  .dstat .a { color: var(--accent); }
+  .more { display: none; padding: 0 12px 12px; }
+  .more button { width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.04); color: var(--code-fg); font-size: 0.875rem; font-weight: 500; cursor: pointer; }
+  @media (max-width: 640px) {
+    .bar { padding: 10px 10px 10px 14px; }
+    .clip.long { position: relative; max-height: 440px; overflow: hidden; }
+    .clip.long::after { content: ""; position: absolute; inset: auto 0 0; height: 96px; background: linear-gradient(transparent, var(--code-bg)); pointer-events: none; }
+    .cp.open .clip.long { max-height: none; }
+    .cp.open .clip.long::after { display: none; }
+    .more { display: block; }
+    .cp.open .more { display: none; }
+  }
+</style>

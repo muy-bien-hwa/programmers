@@ -1,0 +1,16 @@
+---
+/** 카드의 점 줄이 무슨 뜻인지 알려주는 범례 */
+---
+<p class="legend">
+  <b>점 하나 = 풀이 하나, 색 = 그 풀이의 시간복잡도</b>
+  <span><i class="t-lin"></i>O(n) 이하</span>
+  <span><i class="t-nlog"></i>O(n log n)</span>
+  <span><i class="t-sq"></i>O(n²) 이상</span>
+</p>
+
+<style>
+  .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 0.875rem; color: var(--ink-2); }
+  b { font-weight: 500; color: var(--ink); }
+  span { display: inline-flex; align-items: center; gap: 6px; }
+  i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+</style>

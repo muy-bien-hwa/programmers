@@ -69,7 +69,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         <span>© {new Date().getFullYear()} {SITE.author} · {SITE.school}</span>
         <span class="foot-links">
           <a href={SITE.github} target="_blank" rel="noopener">GitHub</a>
-          <span>{SITE.email}</span>
+          <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
         </span>
       </div>
     </footer>
@@ -80,6 +80,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         if (t) return t === 'dark';
         return matchMedia('(prefers-color-scheme: dark)').matches;
       }
+      function label() {
+        const btn = document.getElementById('theme-toggle');
+        if (btn) btn.setAttribute('aria-label', currentDark() ? '라이트 테마로 전환' : '다크 테마로 전환');
+      }
       function bind() {
         const btn = document.getElementById('theme-toggle');
         if (!btn || btn.dataset.bound) return;
@@ -89,7 +93,9 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
           document.documentElement.setAttribute('data-theme', next);
           try { localStorage.setItem('theme', next); } catch {}
           window.dispatchEvent(new Event('themechange'));
+          label();
         });
+        label();
       }
       function markNav() {
         const path = location.pathname;
@@ -104,41 +110,48 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
 </html>
 
 <style>
-  .skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: var(--paper); padding: 8px 12px; border-radius: 8px; z-index: 50; }
+  .skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: var(--paper); padding: 10px 14px; border-radius: 8px; z-index: 50; }
   .skip:focus { left: 12px; }
   body::before {
     content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30;
-    background: color-mix(in srgb, var(--paper) 86%, transparent);
+    background: var(--nav-bg);
   }
   .nav {
     position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
-    background: color-mix(in srgb, var(--paper) 82%, transparent);
-    backdrop-filter: blur(12px) saturate(1.2); -webkit-backdrop-filter: blur(12px) saturate(1.2);
-    border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+    background: var(--nav-bg);
+    backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2);
+    border-bottom: 1px solid var(--line);
   }
-  .nav-in { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 16px; }
-  .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-family: var(--font-display); font-weight: 600; font-size: 0.9375rem; letter-spacing: -0.01em; }
-  .brand svg path { stroke-dasharray: 40; stroke-dashoffset: 0; transition: stroke-dashoffset .6s var(--ease-out); }
+  .nav-in { display: flex; align-items: center; justify-content: space-between; height: var(--nav-h); gap: 12px; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; color: var(--ink); text-decoration: none; font-family: var(--font-display); font-weight: 600; font-size: 1.0625rem; letter-spacing: -0.01em; }
+  .brand svg { flex: none; }
+  .brand svg path { stroke-dasharray: 40; stroke-dashoffset: 0; }
   .brand:hover svg path { animation: redraw 0.9s var(--ease-out); }
   .brand:hover svg path:nth-child(2) { animation-delay: .08s; }
   .brand:hover svg path:nth-child(3) { animation-delay: .16s; }
   @keyframes redraw { from { stroke-dashoffset: 40; } to { stroke-dashoffset: 0; } }
-  nav { display: flex; align-items: center; gap: 4px; }
-  nav a { color: var(--ink-2); text-decoration: none; font-weight: 500; font-size: 0.9375rem; padding: 6px 12px; border-radius: 8px; transition: color .2s, background .2s; }
+  nav { display: flex; align-items: center; gap: 6px; }
+  nav a { display: inline-flex; align-items: center; height: 44px; padding: 0 14px; border-radius: 10px; color: var(--ink-2); text-decoration: none; font-weight: 500; font-size: 0.9375rem; transition: color .15s, background .15s; }
   nav a:hover { color: var(--ink); background: var(--accent-soft); }
-  nav a[aria-current="page"] { color: var(--ink); background: var(--accent-soft); }
-  .theme { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; margin-left: 6px; color: var(--ink-2); transition: color .2s, border-color .2s, transform .3s var(--ease-out); }
-  .theme:hover { color: var(--ink); border-color: var(--accent); transform: rotate(-12deg); }
-  .theme .moon { display: none; }
-  :global(:root[data-theme="dark"]) .theme .sun { display: none; }
-  :global(:root[data-theme="dark"]) .theme .moon { display: block; }
+  nav a[aria-current="page"] { color: var(--accent-text); background: var(--accent-soft); }
+  .theme { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; margin-left: 8px; color: var(--ink); transition: border-color .15s; }
+  .theme:hover { border-color: var(--accent); }
+  .theme .sun { display: none; }
+  :global(:root[data-theme="dark"]) .theme .sun { display: block; }
+  :global(:root[data-theme="dark"]) .theme .moon { display: none; }
   @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme="light"])) .theme .sun { display: none; }
-    :global(:root:not([data-theme="light"])) .theme .moon { display: block; }
+    :global(:root:not([data-theme="light"])) .theme .sun { display: block; }
+    :global(:root:not([data-theme="light"])) .theme .moon { display: none; }
   }
   main { min-height: 70vh; }
-  .foot { margin-top: 120px; border-top: 1px solid var(--line); }
-  .foot-in { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-block: 28px 40px; color: var(--ink-3); font-size: 0.875rem; }
+  .foot { margin-top: 96px; border-top: 1px solid var(--line); background: var(--paper); }
+  .foot-in { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; padding-block: 28px 36px; color: var(--ink-3); font-size: 0.875rem; }
   .foot-links { display: inline-flex; gap: 16px; flex-wrap: wrap; }
   .foot a { color: var(--ink-2); }
+  @media (max-width: 640px) {
+    nav { gap: 2px; }
+    .theme { margin-left: 4px; }
+    .foot { margin-top: 64px; }
+    .foot-in { flex-direction: column; padding-block: 24px 32px; }
+  }
 </style>

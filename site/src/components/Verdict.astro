@@ -1,0 +1,13 @@
+---
+import Icon from './Icon.astro';
+import { verdictOf, type Solution } from '../lib/problems';
+interface Props { s: Solution; }
+const v = verdictOf(Astro.props.s);
+---
+{v.kind !== 'none' && (
+  <span class={`verdict ${v.kind}`}>
+    {v.kind === 'ok' && <Icon name="check" size={14} />}
+    {v.kind === 'fail' && <Icon name="x" size={14} />}
+    {v.text}
+  </span>
+)}

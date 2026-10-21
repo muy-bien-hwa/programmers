@@ -1,52 +1,76 @@
 ---
 import type { Problem } from '../lib/problems';
+import { bigO, storyOf } from '../lib/problems';
 import { url } from '../lib/site';
+import Icon from './Icon.astro';
 interface Props { p: Problem; }
 const { p } = Astro.props;
 const f = p.final;
+const story = storyOf(p);
+const aria = `풀이 ${p.solutions.length}개: ` + p.solutions.map((s) => `S${s.index} ${bigO(s)}`).join(', ');
 ---
 <a class="card" href={url(`problems/${p.slug}`)}
    data-level={p.level ?? ''} data-tags={p.tags.join('|')} data-title={p.title} data-tier={f?.tier ?? 'unknown'}
    data-solved={p.solved ?? ''} data-tries={p.solutions.length}>
   <div class="top">
     <span class="level">{p.level !== null ? `Lv.${p.level}` : 'Lv.?'}</span>
-    {f && <span class={`bigo t-${f.tier}`}>{f.complexity ?? '미기재'}</span>}
+    {f && <span class={`bigo t-${f.tier}`}>{bigO(f)}</span>}
   </div>
-  <h3 transition:name={`title-${p.slug}`}>{p.title}</h3>
-  {p.summaryText && <p class="sum">{p.summaryText.split('\n')[0]}</p>}
-  <div class="trail" aria-label={`풀이 ${p.solutions.length}개`}>
-    {p.solutions.map((s, i) => (
-      <>
-        {i > 0 && <span class="seg" />}
-        <span class={`dot t-${s.tier}${i === p.solutions.length - 1 ? ' fin' : ''}`} title={`Solution ${s.index}: ${s.complexity ?? '미기재'}`} />
-      </>
-    ))}
-    <span class="tries">풀이 {p.solutions.length}개</span>
+  <div class="body">
+    <h3 transition:name={`title-${p.slug}`}>{p.title}</h3>
+    {p.summaryText && <p class="sum">{p.summaryText.split('\n')[0]}</p>}
+  </div>
+  <div class="trail" role="img" aria-label={aria}>
+    <span class="story">{story.label}</span>
+    <span class="dots">
+      {p.solutions.map((s, i) => (
+        <>
+          {i > 0 && <span class="seg" aria-hidden="true" />}
+          <span class={`dot t-${s.tier}${i === p.solutions.length - 1 ? ' fin' : ''}`} aria-hidden="true"><i></i>S{s.index}</span>
+        </>
+      ))}
+    </span>
+    {story.text && <span class="to">{story.text}</span>}
   </div>
   <div class="foot">
     <span class="tags">{p.tags.slice(0, 3).map((t) => <span class="chip">{t}</span>)}</span>
-    {p.solved && <time datetime={p.solved}>{p.solved.replaceAll('-', '.')}</time>}
+    <span class="end">
+      {p.solved && <time datetime={p.solved}>{p.solved.replaceAll('-', '.')}</time>}
+      <span class="go">풀이 보기<Icon name="right" size={16} /></span>
+    </span>
   </div>
 </a>
 
 <style>
   .card {
-    position: relative; display: grid; gap: 12px; align-content: start; text-decoration: none; color: var(--ink);
-    background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 20px 18px;
-    transition: transform .35s var(--ease-out), border-color .25s, box-shadow .35s var(--ease-out);
-    min-width: 0;
+    position: relative; display: flex; flex-direction: column; gap: 14px; text-decoration: none; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px;
+    box-shadow: var(--shadow); min-width: 0;
+    transition: transform .15s var(--ease-out), border-color .15s, box-shadow .15s var(--ease-out);
   }
-  .card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); box-shadow: var(--shadow); }
+  .card:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: var(--shadow-lift); }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 14px; }
   .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  h3 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; }
+  .body { display: grid; gap: 6px; }
+  h3 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.35; text-decoration: underline transparent 2px; text-underline-offset: 5px; transition: text-decoration-color .15s; }
+  .card:hover h3 { text-decoration-color: var(--accent); }
   .sum { color: var(--ink-2); font-size: 0.9375rem; line-height: 1.65; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .trail { display: flex; align-items: center; gap: 0; }
-  .dot { width: 12px; height: 12px; border-radius: 50%; border: 2.5px solid var(--c, var(--c-unknown)); background: var(--surface); flex: none; transition: transform .3s var(--ease-out); }
-  .dot.fin { background: var(--c, var(--c-unknown)); }
-  .seg { width: 22px; height: 2px; background: var(--line); flex: none; }
-  .card:hover .dot { transform: scale(1.15); }
-  .tries { margin-left: 12px; font: 0.75rem var(--font-mono); color: var(--ink-3); }
-  .foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .trail { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; padding: 10px 12px; background: var(--paper); border-radius: 10px; margin-top: auto; }
+  .story { font-size: 0.8125rem; font-weight: 500; color: var(--ink-3); }
+  .dots { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { display: inline-flex; align-items: center; gap: 5px; font: 0.8125rem var(--font-mono); color: var(--ink-2); }
+  .dot i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+  .dot.fin i { box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 28%, transparent); }
+  .seg { width: 14px; height: 2px; border-radius: 2px; background: var(--line-2); flex: none; }
+  .to { margin-left: auto; font-size: 0.8125rem; font-weight: 500; color: var(--ink); white-space: nowrap; }
+  .foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .tags { display: flex; gap: 6px; flex-wrap: wrap; }
-  time { font: 0.75rem var(--font-mono); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .end { display: grid; justify-items: end; flex: none; }
+  .end > * { grid-area: 1 / 1; transition: opacity .15s; }
+  time { font: 0.8125rem var(--font-mono); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .go { display: inline-flex; align-items: center; gap: 2px; font-size: 0.875rem; font-weight: 600; color: var(--accent-text); opacity: 0; }
+  .card:hover .go, .card:focus-visible .go { opacity: 1; }
+  .card:hover time, .card:focus-visible time { opacity: 0; }
+  @media (max-width: 640px) { .card { padding: 18px; } }
+  @media (prefers-reduced-motion: reduce) { .card:hover { transform: none; } }
 </style>

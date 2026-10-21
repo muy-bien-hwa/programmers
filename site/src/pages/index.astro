@@ -3,154 +3,186 @@ import Base from '../layouts/Base.astro';
 import HeroPlot from '../components/HeroPlot.astro';
 import ProblemCard from '../components/ProblemCard.astro';
 import Heatmap from '../components/Heatmap.astro';
-import { getProblems, activity } from '../lib/problems';
+import TierLegend from '../components/TierLegend.astro';
+import Icon from '../components/Icon.astro';
+import { getProblems, activity, lowered } from '../lib/problems';
 import { SITE, url } from '../lib/site';
 
 const problems = getProblems();
 const featured = [...problems].sort((a, b) => b.solutions.length - a.solutions.length || (b.solved ?? '').localeCompare(a.solved ?? ''))[0] ?? null;
 const totalSolutions = problems.reduce((a, p) => a + p.solutions.length, 0);
-const rank = { sq: 3, nlog: 2, lin: 1, unknown: 0 } as const;
-const improved = problems.filter((p) => {
-  const a = p.solutions[0], b = p.final;
-  return a && b && a !== b && rank[a.tier] > rank[b.tier] && rank[b.tier] > 0;
-}).length;
-const avgTries = problems.length ? totalSolutions / problems.length : 0;
+const improved = problems.filter(lowered).length;
+const reworked = problems.filter((p) => p.solutions.length > 1).length;
+const levelSet = [...new Set(problems.map((p) => p.level).filter((l) => l !== null))];
 const levels = [0, 1, 2, 3, 4, 5].map((lv) => ({ lv, n: problems.filter((p) => p.level === lv).length }));
 const maxLv = Math.max(1, ...levels.map((l) => l.n));
 const recent = problems.slice(0, 6);
 const heat = activity(problems);
+// 문제가 적을 때는 잔디가 거의 비어 보이므로 숨긴다
+const HEAT_MIN = 10;
 ---
 <Base active="home">
-  <section class="hero wrap">
-    <div class="hero-text">
+  <div class="home wrap">
+    <section class="hero-text" aria-labelledby="hero-title">
       <p class="who"><span class="pulse" aria-hidden="true"></span>{SITE.author}의 프로그래머스 풀이 기록</p>
-      <h1 class="title" aria-label="Solve Trace">
+      <h1 class="title" id="hero-title" aria-label="Solve Trace">
         <span class="w">Solve</span>
         <span class="w">Trace</span>
       </h1>
       <p class="lede">정답 코드만 올리지 않는다. 처음 짠 풀이가 왜 느렸는지, 어떻게 고쳐서 빨라졌는지까지 단계별로 남긴다.</p>
       <div class="cta">
-        <a class="btn primary" href={url('problems')}>문제 {problems.length}개 보기</a>
-        {featured && <a class="btn" href={url(`problems/${featured.slug}`)}>{featured.title} 풀이 과정</a>}
+        <a class="btn primary" href={url('problems')}>문제 {problems.length}개 보기<Icon name="right" size={16} /></a>
+        {featured && <a class="btn ghost" href={url(`problems/${featured.slug}`)}>{featured.title} 풀이 과정 보기</a>}
       </div>
-    </div>
-    <HeroPlot featured={featured} />
-  </section>
+    </section>
 
-  <section class="wrap" aria-label="요약"><div class="stats">
-    <div class="stat"><b data-count={problems.length}>{problems.length}</b><span>푼 문제</span></div>
-    <div class="stat"><b data-count={totalSolutions}>{totalSolutions}</b><span>작성한 풀이</span></div>
-    <div class="stat"><b data-count={avgTries} data-dec="1">{avgTries.toFixed(1)}</b><span>문제당 평균 시도</span></div>
-    <div class="stat"><b data-count={improved}>{improved}</b><span>복잡도를 낮춘 문제</span></div>
-    <div class="stat levels">
-      <div class="bars" role="img" aria-label={levels.map((l) => `Lv.${l.lv} ${l.n}개`).join(', ')}>
-        {levels.map((l) => (
-          <div class="bar"><i style={`--h:${(l.n / maxLv) * 100}%`}></i><small>{l.lv}</small></div>
-        ))}
+    <section class="plot-area" aria-label="복잡도 그래프">
+      <h2 class="plot-title">{featured ? `${featured.title} 풀이가 빨라진 과정` : '복잡도 그래프'}</h2>
+      <HeroPlot featured={featured} />
+    </section>
+
+    <section class="stats-area" aria-label="기록 요약">
+      <dl class="stats">
+        <div class="stat"><dt>푼 문제</dt><dd data-count={problems.length}>{problems.length}</dd></div>
+        <div class="stat"><dt>작성한 풀이</dt><dd data-count={totalSolutions}>{totalSolutions}</dd></div>
+        <div class="stat"><dt>복잡도를 낮춘 문제</dt><dd data-count={improved}>{improved}</dd></div>
+        <div class="stat"><dt>두 번 이상 고친 문제</dt><dd data-count={reworked}>{reworked}</dd></div>
+        {levelSet.length >= 2 && (
+          <div class="stat levels">
+            <dt>레벨 분포</dt>
+            <dd class="bars" role="img" aria-label={levels.map((l) => `Lv.${l.lv} ${l.n}개`).join(', ')}>
+              {levels.map((l) => (
+                <div class="bar"><i style={`--h:${(l.n / maxLv) * 100}%`}></i><small>{l.lv}</small></div>
+              ))}
+            </dd>
+          </div>
+        )}
+      </dl>
+    </section>
+
+    <section class="recent-area" aria-labelledby="recent-title">
+      <div class="block-head">
+        <h2 class="section-title" id="recent-title">최근에 푼 문제</h2>
+        <a class="more" href={url('problems')}>전체 목록<Icon name="right" size={16} /></a>
       </div>
-      <span>레벨 분포</span>
-    </div>
-  </div></section>
+      <TierLegend />
+      <div class="cards">
+        {recent.map((p) => <ProblemCard p={p} />)}
+        {recent.length < 3 && (
+          <div class="card-empty">
+            <svg viewBox="0 0 120 48" width="120" height="48" aria-hidden="true"><path d="M6 42 C 30 42, 60 30, 114 6" fill="none" stroke="var(--line-2)" stroke-width="2.5" stroke-dasharray="6 6" stroke-linecap="round"/></svg>
+            <p><b>다음 문제를 푸는 중</b></p>
+            <p>programmers 폴더에 문제 폴더를 추가하고 push하면 여기에 자동으로 나타난다.</p>
+          </div>
+        )}
+      </div>
+    </section>
 
-  <section class="wrap block">
-    <div class="block-head">
-      <h2 class="section-title">최근에 푼 문제</h2>
-      <a class="more" href={url('problems')}>전체 목록</a>
-    </div>
-    <div class="cards">
-      {recent.map((p) => <ProblemCard p={p} />)}
-      {recent.length < 3 && (
-        <div class="card-empty">
-          <svg viewBox="0 0 120 60" width="120" height="60" aria-hidden="true"><path d="M6 54 C 30 54, 60 40, 114 8" fill="none" stroke="var(--line)" stroke-width="2.5" stroke-dasharray="6 6" stroke-linecap="round"/></svg>
-          <p><b>다음 문제를 푸는 중</b></p>
-          <p>programmers 폴더에 문제 폴더를 추가하고 push하면 여기에 자동으로 나타난다.</p>
-        </div>
-      )}
-    </div>
-  </section>
+    {problems.length >= HEAT_MIN && (
+      <section class="heat-area" aria-labelledby="heat-title">
+        <div class="block-head"><h2 class="section-title" id="heat-title">풀이 기록</h2></div>
+        <Heatmap data={heat} weeks={53} />
+      </section>
+    )}
 
-  <section class="wrap block">
-    <div class="block-head"><h2 class="section-title">풀이 기록</h2></div>
-    <Heatmap data={heat} weeks={53} />
-  </section>
-
-  <section class="wrap block how">
-    <div class="block-head"><h2 class="section-title">이 사이트가 만들어지는 방식</h2></div>
-    <ol class="steps">
-      <li><b>문제 폴더 추가</b><span>문제마다 README.md와 solution_1.py, solution_2.py ... 를 넣는다.</span></li>
-      <li><b>push</b><span>GitHub Actions가 폴더를 읽어 풀이 단계, 복잡도, 코드 diff를 계산한다.</span></li>
-      <li><b>자동 배포</b><span>정적 페이지로 빌드되어 GitHub Pages에 올라간다. 따로 글을 쓸 필요가 없다.</span></li>
-    </ol>
-  </section>
+    <section class="how-area" aria-labelledby="how-title">
+      <h2 id="how-title">이 사이트가 만들어지는 방식</h2>
+      <ol class="steps">
+        <li><span class="n" aria-hidden="true">1</span><span><b>문제 폴더 추가</b><span>문제마다 README.md와 solution_1.py, solution_2.py … 를 넣는다.</span></span></li>
+        <li><span class="n" aria-hidden="true">2</span><span><b>push</b><span>GitHub Actions가 폴더를 읽어 풀이 단계, 복잡도, 코드 diff를 계산한다.</span></span></li>
+        <li><span class="n" aria-hidden="true">3</span><span><b>자동 배포</b><span>정적 페이지로 빌드되어 GitHub Pages에 올라간다. 따로 글을 쓸 필요가 없다.</span></span></li>
+      </ol>
+    </section>
+  </div>
 </Base>
 
 <style>
-  .hero { display: grid; gap: 36px; padding-block: 64px 0; }
-  .hero-text { display: grid; gap: 22px; max-width: 760px; }
+  /* 데스크톱: 제목 | 그래프 → 요약 → 최근 문제 → (잔디) → 만드는 방식
+     모바일: 제목 → 최근 문제 → 그래프 → 요약 → 만드는 방식 (첫 화면에 카드가 보이게) */
+  .home {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 560px); column-gap: 48px;
+    grid-template-areas: "text plot" "stats stats" "recent recent" "heat heat" "how how";
+    padding-top: 56px;
+  }
+  .hero-text { grid-area: text; align-self: center; display: grid; gap: 22px; }
+  .plot-area { grid-area: plot; align-self: center; min-width: 0; }
+  .stats-area { grid-area: stats; margin-top: 32px; }
+  .recent-area { grid-area: recent; margin-top: 56px; display: grid; gap: 16px; }
+  .heat-area { grid-area: heat; margin-top: 64px; display: grid; gap: 16px; }
+  .how-area { grid-area: how; margin-top: 64px; display: grid; gap: 18px; }
+
   .who { display: inline-flex; align-items: center; gap: 10px; font-size: 0.9375rem; color: var(--ink-2); font-weight: 500; }
-  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--c-lin); box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-lin) 60%, transparent); animation: pulse 2.4s infinite; }
-  @keyframes pulse { 70% { box-shadow: 0 0 0 10px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); flex: none; }
   .title {
-    font-family: var(--font-display); font-weight: 800; letter-spacing: -0.045em; line-height: 0.92;
-    font-size: clamp(3.5rem, 11vw, 8.5rem); display: flex; flex-wrap: wrap; column-gap: 0.22em;
+    font-family: var(--font-display); font-weight: 800; letter-spacing: -0.035em; line-height: 1.02;
+    font-size: clamp(2.625rem, 5vw, 4rem); display: flex; flex-wrap: wrap; column-gap: 0.25em;
   }
-  .title .w { display: inline-block; animation: rise .9s var(--ease-out) both; }
+  .title .w { display: inline-block; animation: rise .8s var(--ease-out) both; }
   .title .w:nth-child(2) {
-    animation-delay: .12s;
-    background: linear-gradient(100deg, var(--c-sq) 0%, var(--c-nlog) 45%, var(--c-lin) 90%);
+    animation-delay: .1s;
+    background: linear-gradient(90deg, var(--c-sq-text), var(--c-nlog-text) 55%, var(--c-lin-text));
     -webkit-background-clip: text; background-clip: text; color: transparent;
-    background-size: 200% 100%; animation: rise .9s var(--ease-out) .12s both, sweep 6s ease-in-out 1.2s infinite alternate;
   }
-  @keyframes rise { from { transform: translateY(0.25em); opacity: 0.001; } to { transform: none; opacity: 1; } }
-  @keyframes sweep { from { background-position: 0% 0; } to { background-position: 100% 0; } }
-  .hero .lede { font-size: clamp(1.0625rem, 1.6vw, 1.25rem); max-width: 40ch; color: var(--ink-2); }
+  @keyframes rise { from { transform: translateY(0.2em); opacity: 0.001; } to { transform: none; opacity: 1; } }
+  .hero-text .lede { font-size: clamp(1rem, 1.5vw, 1.125rem); max-width: 30em; color: var(--ink-2); text-wrap: pretty; }
   .cta { display: flex; gap: 10px; flex-wrap: wrap; }
+  .plot-title { display: none; }
 
-  .stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; margin-top: 40px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); overflow: hidden; }
-  .stat { display: grid; gap: 4px; align-content: end; padding: 20px 22px; border-right: 1px solid var(--line); min-width: 0; }
-  .stat:last-child { border-right: 0; }
-  .stat b { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.75rem, 3.4vw, 2.5rem); line-height: 1.1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-  .stat span { font-size: 0.8125rem; color: var(--ink-3); }
-  .bars { display: flex; align-items: flex-end; gap: 6px; height: 46px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+  .stat { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 2px; padding: 18px 22px; border-left: 1px solid var(--line); margin-left: -1px; min-width: 0; }
+  .stat dd { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 1.75rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .stat dt { font-size: 0.875rem; color: var(--ink-2); }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 40px; }
   .bar { flex: 1; display: grid; grid-template-rows: 1fr auto; height: 100%; gap: 2px; justify-items: center; }
-  .bar i { align-self: end; width: 100%; max-width: 18px; height: max(3px, var(--h)); background: var(--accent); border-radius: 3px 3px 1px 1px; transform-origin: bottom; animation: grow .8s var(--ease-out) both .3s; }
-  .bar small { font: 0.625rem var(--font-mono); color: var(--ink-3); line-height: 1; }
-  @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+  .bar i { align-self: end; width: 100%; max-width: 18px; height: max(3px, var(--h)); background: var(--accent); border-radius: 3px 3px 1px 1px; }
+  .bar small { font: 0.75rem var(--font-mono); color: var(--ink-3); line-height: 1; }
 
-  .block { margin-top: 96px; display: grid; gap: 22px; }
   .block-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
-  .more { font-weight: 500; font-size: 0.9375rem; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-  .card-empty { border: 1.5px dashed var(--line); border-radius: 16px; padding: 22px; display: grid; gap: 8px; align-content: center; color: var(--ink-3); font-size: 0.9375rem; min-height: 200px; }
-  .card-empty b { color: var(--ink-2); }
+  .more { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; font-weight: 600; font-size: 0.9375rem; text-decoration: none; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 4px; }
+  .card-empty { border: 1.5px dashed var(--line-2); border-radius: 14px; padding: 24px; display: grid; gap: 8px; align-content: center; color: var(--ink-2); font-size: 0.90625rem; min-height: 200px; }
+  .card-empty b { color: var(--ink); font-size: 1rem; }
 
-  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: s; }
-  .steps li { counter-increment: s; display: grid; gap: 6px; padding: 20px; border-top: 2px solid var(--ink); }
-  .steps li::before { content: counter(s); font-family: var(--font-display); font-weight: 600; font-size: 0.875rem; color: var(--accent); }
-  .steps b { font-size: 1.0625rem; }
-  .steps span { color: var(--ink-2); font-size: 0.9375rem; }
+  .how-area h2 { font-size: 1.25rem; font-weight: 700; }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .steps li { display: flex; gap: 14px; align-items: flex-start; }
+  .steps .n { flex: none; width: 32px; height: 32px; border-radius: 50%; display: inline-grid; place-items: center; font-family: var(--font-display); font-weight: 600; font-size: 0.875rem; background: var(--ink); color: var(--paper); }
+  .steps li > span:last-child { display: grid; gap: 2px; }
+  .steps b { font-size: 1rem; }
+  .steps li span span { color: var(--ink-2); font-size: 0.90625rem; line-height: 1.6; }
 
   @media (max-width: 900px) {
-    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .stat { border-bottom: 1px solid var(--line); }
-    .stat:nth-child(2n) { border-right: 0; }
-    .stat.levels { grid-column: 1 / -1; border-bottom: 0; }
+    .home { grid-template-columns: minmax(0, 1fr); grid-template-areas: "text" "recent" "plot" "stats" "heat" "how"; padding-top: 28px; }
+    .hero-text { gap: 14px; }
+    .recent-area { margin-top: 40px; }
+    .plot-area { margin-top: 40px; display: grid; gap: 12px; }
+    .plot-title { display: block; font-size: 1.3125rem; font-weight: 700; letter-spacing: -0.01em; }
+    .stats-area { margin-top: 24px; }
+    .how-area, .heat-area { margin-top: 44px; }
     .steps { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stat { padding: 14px 16px; border-top: 1px solid var(--line); margin-top: -1px; }
+    .stat dd { font-size: 1.5rem; }
+    .stat.levels { grid-column: 1 / -1; }
   }
-  @media (max-width: 400px) { .cards { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) {
+    .cta .ghost { display: none; }
+    .cta .primary { flex: 1; }
+    .cards { grid-template-columns: 1fr; gap: 12px; }
+  }
 </style>
 
 <script>
   import { onPage, reduceMotion } from '../scripts/util';
   onPage(() => {
     if (reduceMotion()) return;
-    const els = [...document.querySelectorAll<HTMLElement>('.stat b[data-count]')];
+    const els = [...document.querySelectorAll<HTMLElement>('.stat dd[data-count]')];
     let raf = 0;
-    const t0 = performance.now(), dur = 1100;
-    const targets = els.map((e) => ({ e, v: Number(e.dataset.count), dec: Number(e.dataset.dec || 0) }));
+    const t0 = performance.now(), dur = 900;
+    const targets = els.map((e) => ({ e, v: Number(e.dataset.count) }));
     const step = (now: number) => {
       const k = Math.min(1, (now - t0) / dur), ease = 1 - Math.pow(1 - k, 4);
-      targets.forEach(({ e, v, dec }) => { e.textContent = (v * ease).toFixed(dec); });
+      targets.forEach(({ e, v }) => { e.textContent = String(Math.round(v * ease)); });
       if (k < 1) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);

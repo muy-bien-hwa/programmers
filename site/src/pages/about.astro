@@ -1,79 +1,90 @@
 ---
 import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
 import { SITE, url } from '../lib/site';
 import { getProblems } from '../lib/problems';
 const n = getProblems().length;
 ---
 <Base title="소개" active="about" description={`${SITE.author} 소개와 연락처`}>
-  <section class="wrap about">
-    <div class="id">
-      <div class="avatar" aria-hidden="true">
-        <svg viewBox="0 0 120 120" width="120" height="120">
-          <rect width="120" height="120" rx="28" fill="var(--code-bg)" />
-          <path class="p1" d="M18 100 C 42 100, 60 88, 102 20" fill="none" stroke="var(--c-sq)" stroke-width="5" stroke-linecap="round" />
-          <path class="p2" d="M18 100 C 50 96, 76 74, 102 46" fill="none" stroke="var(--c-nlog)" stroke-width="5" stroke-linecap="round" />
-          <path class="p3" d="M18 100 L 102 70" fill="none" stroke="var(--c-lin)" stroke-width="5" stroke-linecap="round" />
-        </svg>
+  <div class="wrap about">
+    <section class="id" aria-labelledby="who">
+      <div class="id-top">
+        <div class="avatar" aria-hidden="true">
+          <svg viewBox="0 0 120 120" width="88" height="88">
+            <rect width="120" height="120" rx="28" fill="var(--code-bg)" />
+            <path class="p1" d="M18 100 C 42 100, 60 88, 102 20" fill="none" stroke="var(--c-sq)" stroke-width="5" stroke-linecap="round" />
+            <path class="p2" d="M18 100 C 50 96, 76 74, 102 46" fill="none" stroke="var(--c-nlog)" stroke-width="5" stroke-linecap="round" />
+            <path class="p3" d="M18 100 L 102 70" fill="none" stroke="var(--c-lin)" stroke-width="5" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div class="who">
+          <p class="eyebrow">소개</p>
+          <h1 id="who">{SITE.author}</h1>
+          <p class="school">{SITE.school}</p>
+        </div>
       </div>
-      <div class="who">
-        <p class="eyebrow">소개</p>
-        <h1>{SITE.author}</h1>
-        <p class="school">{SITE.school}</p>
-      </div>
-    </div>
-
-    <dl class="contact">
-      <div>
-        <dt>GitHub</dt>
-        <dd><a href={SITE.github} target="_blank" rel="noopener">github.com/{SITE.githubId}</a></dd>
-      </div>
-      <div>
-        <dt>이메일</dt>
-        <dd class="mail">
-          <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
-          <button type="button" class="copy" id="copy-mail" data-v={SITE.email}>복사</button>
-        </dd>
-      </div>
-    </dl>
-
-    <div class="site-note">
-      <h2>이 사이트에 대해</h2>
+      <dl class="contact">
+        <div>
+          <dt><Icon name="github" size={15} />GitHub</dt>
+          <dd><a href={SITE.github} target="_blank" rel="noopener">github.com/{SITE.githubId}</a></dd>
+        </div>
+        <div>
+          <dt><Icon name="mail" size={15} />이메일</dt>
+          <dd class="mail">
+            <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
+            <button type="button" class="copy" id="copy-mail" data-v={SITE.email}><Icon name="copy" size={15} /><span>복사</span></button>
+          </dd>
+        </div>
+      </dl>
+    </section>
+    <section class="site-note" aria-labelledby="site">
+      <h2 id="site">이 사이트에 대해</h2>
       <p>프로그래머스에서 푼 문제 {n}개를 풀이 단계별로 정리했다. 문제마다 처음 풀이부터 마지막 풀이까지 시간복잡도가 어떻게 바뀌었는지, 코드의 어느 줄이 바뀌었는지 보여주고, 브라우저에서 직접 실행해 볼 수 있다.</p>
       <p>풀이 폴더를 GitHub에 push하면 Astro가 폴더를 읽어 페이지를 만들고 GitHub Pages에 자동으로 배포한다.</p>
       <div class="links">
-        <a class="btn primary" href={url('problems')}>문제 보러 가기</a>
-        <a class="btn" href={`${SITE.github}`} target="_blank" rel="noopener">GitHub 프로필</a>
+        <a class="btn primary" href={url('problems')}>문제 보러 가기<Icon name="right" size={16} /></a>
+        <a class="btn" href={SITE.github} target="_blank" rel="noopener"><Icon name="github" size={16} />GitHub 프로필</a>
       </div>
-    </div>
-  </section>
+    </section>
+  </div>
 </Base>
 
 <style>
-  .about { padding-block: 72px 0; display: grid; gap: 48px; max-width: 820px; }
-  .id { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
-  .avatar svg { display: block; border-radius: 28px; box-shadow: var(--shadow); }
+  .about { padding-top: 72px; display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 56px; align-items: start; max-width: calc(880px + 48px + 128px); }
+  .id { display: grid; gap: 24px; padding: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+  .id-top { display: flex; align-items: center; gap: 18px; }
+  .avatar svg { display: block; }
   .avatar path { stroke-dasharray: 140; animation: draw 1.4s var(--ease-out) both; }
   .avatar .p2 { animation-delay: .15s; }
   .avatar .p3 { animation-delay: .3s; }
   @keyframes draw { from { stroke-dashoffset: 140; } to { stroke-dashoffset: 0; } }
-  .who { display: grid; gap: 6px; }
-  h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(2.25rem, 6vw, 3.75rem); letter-spacing: -0.04em; line-height: 1.05; word-break: break-all; }
-  .school { font-size: 1.125rem; color: var(--ink-2); font-weight: 500; }
+  .who { display: grid; gap: 2px; min-width: 0; }
+  h1 { font-family: var(--font-display); font-weight: 600; font-size: 1.625rem; letter-spacing: -0.02em; line-height: 1.25; overflow-wrap: anywhere; }
+  .school { font-size: 0.9375rem; color: var(--ink-2); }
   .contact { margin: 0; display: grid; border-top: 1px solid var(--line); }
-  .contact div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; padding-block: 16px; border-bottom: 1px solid var(--line); align-items: center; }
-  .contact dt { color: var(--ink-3); font-size: 0.875rem; }
+  .contact div { display: grid; gap: 4px; padding-block: 14px; border-bottom: 1px solid var(--line); }
+  .contact dt { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-3); font-size: 0.84375rem; }
   .contact dd { margin: 0; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
-  .contact a { color: var(--ink); text-decoration-color: var(--line); }
-  .contact a:hover { color: var(--accent); }
-  .mail { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .copy { cursor: pointer; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 3px 10px; transition: all .2s; }
-  .copy:hover { border-color: var(--accent); color: var(--ink); }
-  .copy.done { background: var(--c-lin); border-color: var(--c-lin); color: var(--surface); }
-  .site-note { display: grid; gap: 14px; max-width: 64ch; }
-  .site-note h2 { font-size: 1.25rem; }
-  .site-note p { color: var(--ink-2); }
-  .links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
-  @media (max-width: 480px) { .contact div { grid-template-columns: 1fr; gap: 2px; } }
+  .contact a { color: var(--accent-text); font-size: 1rem; }
+  .mail { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .copy { flex: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; font-size: 0.875rem; font-weight: 500; border: 1px solid var(--line-2); background: var(--surface); color: var(--ink); border-radius: 8px; transition: border-color .15s; }
+  .copy:hover { border-color: var(--accent); }
+  .copy.done { border-color: var(--accent); color: var(--accent-text); background: var(--accent-soft); }
+  .site-note { display: grid; gap: 16px; padding-top: 8px; }
+  .site-note h2 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.015em; }
+  .site-note p { color: var(--ink-2); font-size: 1.0625rem; line-height: 1.8; text-wrap: pretty; }
+  .links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  @media (max-width: 860px) {
+    .about { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-top: 32px; }
+    .id { padding: 20px; gap: 18px; }
+    .avatar svg { width: 72px; height: 72px; }
+    h1 { font-size: 1.375rem; }
+    .copy { min-height: 44px; }
+    .site-note h2 { font-size: 1.375rem; }
+    .site-note p { font-size: 1rem; }
+    .links { flex-direction: column; }
+    .links .btn { min-height: 48px; }
+  }
 </style>
 
 <script>
@@ -81,11 +92,12 @@ const n = getProblems().length;
   onPage(() => {
     const b = document.getElementById('copy-mail') as HTMLButtonElement | null;
     if (!b) return;
+    const label = b.querySelector('span')!;
     b.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(b.dataset.v || ''); b.textContent = '복사됨'; }
-      catch { const r = document.createRange(); r.selectNodeContents(b.previousElementSibling!); getSelection()?.removeAllRanges(); getSelection()?.addRange(r); b.textContent = '선택됨'; }
+      try { await navigator.clipboard.writeText(b.dataset.v || ''); label.textContent = '복사됨'; }
+      catch { const r = document.createRange(); r.selectNodeContents(b.previousElementSibling!); getSelection()?.removeAllRanges(); getSelection()?.addRange(r); label.textContent = '선택됨'; }
       b.classList.add('done');
-      setTimeout(() => { b.textContent = '복사'; b.classList.remove('done'); }, 1600);
+      setTimeout(() => { label.textContent = '복사'; b.classList.remove('done'); }, 1600);
     });
   });
 </script>
